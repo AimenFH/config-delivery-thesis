@@ -1,0 +1,47 @@
+# WAY B - configuration as a mounted ConfigMap volume, activated in-process.
+#
+# The kubelet rewrites the files on its sync cycle (~1 min) plus the ConfigMap
+# cache TTL, so worst case is roughly two minutes and varies per node.
+#
+# IMPORTANT: do NOT use subPath here. A subPath mount is never updated by the
+# kubelet - a known Kubernetes limitation and a documented production trap.
+#
+# Spring does not notice the file change by itself. The Spring Cloud Kubernetes
+# Configuration Watcher observes the ConfigMap and calls /actuator/refresh on the
+# affected pods. (The old PropertySource Reload is deprecated - do not use it.)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: probe-service
+  namespace: thesis
+  annotations:
+    # Marks this deployment for the Configuration Watcher
+    spring.cloud.kubernetes.configmap.reload: "true"
+spec:
+  replicas: 3
+  selector:
+    matchLabels: {app: probe-service}
+  template:
+    metadata:
+      labels: {app: probe-service}
+    spec:
+      containers:
+        - name: probe
+          image: probe-service:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 8080}]
+          env:
+            - name: SPRING_CONFIG_IMPORT
+              value: "configtree:/etc/config/"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/config      # whole directory, never subPath
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 8080}
+            periodSeconds: 2
+          resources:
+            requests: {cpu: "250m", memory: "384Mi"}
+            limits:   {cpu: "500m", memory: "512Mi"}
+      volumes:
+        - name: config
+          configMap: {name: demo-config}

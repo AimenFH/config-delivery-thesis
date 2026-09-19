@@ -1,0 +1,50 @@
+# WAY A - configuration as environment variables.
+#
+# A process reads its environment once at exec() time. There is no API to change
+# another process's environment. Updating the ConfigMap therefore has NO effect on
+# running pods - this path is structurally restart-only, not slow-by-accident.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: probe-service
+  namespace: thesis
+spec:
+  replicas: 3
+  selector:
+    matchLabels: {app: probe-service}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels: {app: probe-service}
+    spec:
+      containers:
+        - name: probe
+          image: probe-service:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 8080}]
+          env:
+            - name: DEMO_VALUE
+              valueFrom: {configMapKeyRef: {name: demo-config, key: value}}
+            - name: DEMO_CONFIGVERSION
+              valueFrom: {configMapKeyRef: {name: demo-config, key: configVersion}}
+            - name: DEMO_TIMEOUTMS
+              valueFrom: {configMapKeyRef: {name: demo-config, key: timeoutMs}}
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 8080}
+            periodSeconds: 2
+          resources:
+            requests: {cpu: "250m", memory: "384Mi"}
+            limits:   {cpu: "500m", memory: "512Mi"}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: probe-service
+  namespace: thesis
+spec:
+  selector: {app: probe-service}
+  ports: [{port: 80, targetPort: 8080}]

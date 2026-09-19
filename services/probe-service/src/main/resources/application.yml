@@ -1,0 +1,24 @@
+spring:
+  application:
+    name: probe-service
+
+# Defaults only. The real values arrive through one of the three delivery paths:
+#   Way A  - environment variables from a ConfigMap (cannot be reloaded)
+#   Way B  - a configtree mounted from a ConfigMap volume
+#   Way C  - Spring Cloud Config Server
+demo:
+  value: "UNSET"
+  configVersion: "v0"
+  timeoutMs: 1000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,refresh,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+server:
+  shutdown: graceful
