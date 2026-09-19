@@ -140,7 +140,3 @@ Expected output:
 | config-validator | not started |
 | starter library | not started |
 | dashboard | not started |
-
-## Licence
-
-To be decided before the repository is made public.
