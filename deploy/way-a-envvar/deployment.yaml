@@ -16,6 +16,14 @@ spec:
     metadata:
       labels: {app: probe-service}
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+          matchLabelKeys: [pod-template-hash]
+          labelSelector:
+            matchLabels: { app: probe-service }
       containers:
         - name: probe
           image: probe-service:0.1.0
@@ -41,5 +49,6 @@ metadata:
   name: probe-service
   namespace: thesis
 spec:
-  selector: {app: probe-service}
-  ports: [{port: 80, targetPort: 8080}]
+  type: NodePort
+  selector: { app: probe-service }
+  ports: [ { port: 80, targetPort: 8080, nodePort: 30080 } ]
