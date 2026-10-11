@@ -28,19 +28,16 @@
       <artifactId>spring-boot-starter-web</artifactId>
     </dependency>
 
-    <!-- Actuator provides /actuator/refresh, the activation trigger for ways B and C -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
 
-    <!-- @RefreshScope lives here -->
     <dependency>
       <groupId>org.springframework.cloud</groupId>
       <artifactId>spring-cloud-starter</artifactId>
     </dependency>
 
-    <!-- Micrometer + Prometheus, for the observability chapter -->
     <dependency>
       <groupId>io.micrometer</groupId>
       <artifactId>micrometer-registry-prometheus</artifactId>

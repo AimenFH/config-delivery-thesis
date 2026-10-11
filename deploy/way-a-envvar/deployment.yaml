@@ -1,8 +1,3 @@
-# WAY A - configuration as environment variables.
-#
-# A process reads its environment once at exec() time. There is no API to change
-# another process's environment. Updating the ConfigMap therefore has NO effect on
-# running pods - this path is structurally restart-only, not slow-by-accident.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

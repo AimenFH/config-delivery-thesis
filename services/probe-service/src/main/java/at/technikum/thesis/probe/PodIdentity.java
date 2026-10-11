@@ -2,14 +2,6 @@ package at.technikum.thesis.probe;
 
 import org.springframework.stereotype.Component;
 
-/**
- * Deliberately NOT @RefreshScope.
- *
- * Pod name and process start time must survive a refresh - if they were rebuilt,
- * startedAt would reset and the scale-out scenario could not be measured.
- * This is also the first concrete example of a bean that a refresh does not touch,
- * which is the intra-JVM angle discussed in the thesis.
- */
 @Component
 public class PodIdentity {
 
