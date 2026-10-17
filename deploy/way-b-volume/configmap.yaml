@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-config
+  namespace: thesis
+data:
+  demo.value: "hello"
+  demo.configVersion: "v1"
+  demo.timeoutMs: "1000"

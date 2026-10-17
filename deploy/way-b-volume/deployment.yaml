@@ -3,8 +3,6 @@ kind: Deployment
 metadata:
   name: probe-service
   namespace: thesis
-  annotations:
-    spring.cloud.kubernetes.configmap.reload: "true"
 spec:
   replicas: 3
   selector:
@@ -13,11 +11,19 @@ spec:
     metadata:
       labels: {app: probe-service}
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+          matchLabelKeys: [pod-template-hash]
+          labelSelector:
+            matchLabels: { app: probe-service }
       containers:
         - name: probe
           image: probe-service:0.1.0
           imagePullPolicy: IfNotPresent
-          ports: [{containerPort: 8080}]
+          ports: [{name: http, containerPort: 8080}]
           env:
             - name: SPRING_CONFIG_IMPORT
               value: "configtree:/etc/config/"
@@ -33,3 +39,13 @@ spec:
       volumes:
         - name: config
           configMap: {name: demo-config}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: probe-service
+  namespace: thesis
+spec:
+  type: NodePort
+  selector: { app: probe-service }
+  ports: [ { port: 80, targetPort: 8080, nodePort: 30080 } ]
