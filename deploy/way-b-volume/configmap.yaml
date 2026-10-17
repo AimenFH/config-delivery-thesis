@@ -3,6 +3,10 @@ kind: ConfigMap
 metadata:
   name: demo-config
   namespace: thesis
+  labels:
+    spring.cloud.kubernetes.config: "true"
+  annotations:
+    spring.cloud.kubernetes.configmap.apps: "probe-service"
 data:
   demo.value: "hello"
   demo.configVersion: "v1"

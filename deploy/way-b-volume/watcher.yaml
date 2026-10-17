@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: config-watcher
+  namespace: thesis
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: config-watcher
+  namespace: thesis
+rules:
+  - apiGroups: [""]
+    resources: [configmaps, pods, services, endpoints, secrets]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: config-watcher
+  namespace: thesis
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: config-watcher
+subjects:
+  - kind: ServiceAccount
+    name: config-watcher
+    namespace: thesis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-watcher
+  namespace: thesis
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: config-watcher}
+  template:
+    metadata:
+      labels: {app: config-watcher}
+    spec:
+      serviceAccountName: config-watcher
+      containers:
+        - name: watcher
+          image: springcloud/spring-cloud-kubernetes-configuration-watcher:3.1.6
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SPRING_CLOUD_KUBERNETES_RELOAD_NAMESPACES_0
+              value: thesis
+            - name: SPRING_CLOUD_KUBERNETES_CONFIGURATION_WATCHER_REFRESHDELAY
+              value: "90000"
+          resources:
+            requests: {cpu: "250m", memory: "512Mi"}
+            limits:   {cpu: "1", memory: "1Gi"}
