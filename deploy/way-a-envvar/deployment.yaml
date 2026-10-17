@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: probe-service
   namespace: thesis
+  annotations:
+    configmap.reloader.stakater.com/reload: "demo-config"
 spec:
   replicas: 3
   selector:
