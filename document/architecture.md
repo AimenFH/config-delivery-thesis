@@ -57,7 +57,8 @@ flowchart LR
 | kind cluster | `deploy/kind/kind-cluster.yaml` | One control plane and three workers, so per-node effects can appear. |
 | Namespace `thesis` | `deploy/namespace.yaml` | Holds every experiment object. Deleting it resets an experiment. |
 | Way A manifests | `deploy/way-a-envvar/` | ConfigMap, Deployment with three replicas, NodePort Service. |
-| Way B manifests | `deploy/way-b-volume/` | Same service, configuration mounted as files. Not working yet. |
+| Way B manifests | `deploy/way-b-volume/` | Same service, configuration mounted as files, ConfigMap labelled for the Watcher. |
+| Platform | `deploy/platform/` | Activation triggers that run across experiments: Reloader (Way A) and the Configuration Watcher (Way B). Installed once, never reset. Move in progress. |
 | Way C | `deploy/way-c-configserver/` | Planned: Config Server, RabbitMQ, Bus refresh. |
 | Experiment runner | `tools/experiment-runner/` (planned) | Load generator and measurement instrument. |
 
@@ -71,10 +72,10 @@ reaches the running process and what makes it take effect.
 | Source | ConfigMap | ConfigMap | Git repository via Config Server |
 | Enters the pod as | Environment variables | Files in `/etc/config/` | HTTP fetch from the Config Server |
 | Read by Spring | Once, at process start | On every refresh (`configtree:`) | On every refresh (`configserver:`) |
-| Activation | Rolling restart | Configuration Watcher calls `/actuator/refresh` | `POST /actuator/busrefresh` over RabbitMQ |
+| Activation | Rolling restart, started by Reloader | Configuration Watcher calls `/actuator/refresh` after `refreshDelay` | `POST /actuator/busrefresh` over RabbitMQ |
 | Pod restarted? | Yes (new `startedAt`) | No | No |
-| Extra components | None | Configuration Watcher | Config Server, RabbitMQ |
-| Status | Working | Next milestone | Planned |
+| Extra components | Reloader | Configuration Watcher | Config Server, RabbitMQ |
+| Status | Working | Working | Planned |
 
 ### Way A in detail
 
@@ -82,19 +83,45 @@ reaches the running process and what makes it take effect.
 sequenceDiagram
     participant Op as Operator
     participant K8s as Kubernetes
+    participant R as Reloader
     participant Old as Old pods (v1)
     participant New as New pods (v2)
 
     Op->>K8s: patch ConfigMap (v1 → v2)
     Note over Old: still serving v1, env vars are never re-read
-    Op->>K8s: rollout restart
+    K8s-->>R: ConfigMap changed
+    R->>K8s: update pod template of probe-service
     loop three times (maxSurge 1, maxUnavailable 0)
         K8s->>New: start one new pod
         New-->>K8s: readiness probe passes (~9 s)
         K8s->>Old: stop one old pod
     end
-    Note over Old,New: between the first ready v2 pod and the last stopped v1 pod,<br/>answers are mixed (≈18 s with three replicas)
+    Note over Old,New: between the first ready v2 pod and the last stopped v1 pod,<br/>answers are mixed (≈18 s with three replicas, manual restart in milestone 1)
 ```
+
+### Way B in detail
+
+```mermaid
+sequenceDiagram
+    participant Op as Operator
+    participant K8s as Kubernetes
+    participant W as Configuration Watcher
+    participant KL as Kubelet (per node)
+    participant P as Pods (unchanged)
+
+    Op->>K8s: patch ConfigMap (v1 → v2)
+    K8s-->>W: ConfigMap changed (labelled, apps: probe-service)
+    K8s-->>KL: ConfigMap changed
+    KL->>P: rewrite files in /etc/config/ (each node on its own schedule)
+    Note over W: waits refreshDelay (90 s)
+    W->>P: POST /actuator/refresh on every pod
+    P->>P: re-read files, rebuild @RefreshScope beans on next request
+    Note over P: same pods, same startedAt, now serving v2
+```
+
+If the refresh arrives before a node's kubelet has rewritten the files, that pod
+re-reads the old files and stays on the old version until the next change. The
+lowest safe `refreshDelay` is therefore the slowest kubelet delay in the cluster.
 
 ## Design decisions
 

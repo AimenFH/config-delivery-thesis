@@ -60,9 +60,11 @@ follow [the Way A runbook](runbook-way-a.md#3-run-the-experiment).
 |---|---|
 | Probe service | Working |
 | Local cluster (kind, 1 control plane and 3 workers) | Working |
-| Way A: environment variables and rolling restart | Working, first manual experiment done |
-| Way B: mounted ConfigMap and runtime refresh | Manifest exists with known bugs; next milestone |
+| Way A: environment variables and rolling restart | Working; restart triggered automatically by Reloader |
+| Way B: mounted ConfigMap and runtime refresh | Working; refresh triggered automatically by the Configuration Watcher |
+| Shared `platform` namespace for both triggers | In progress |
+| Kubelet delay measured, `refreshDelay` tuned | Next |
 | Way C: Config Server and Spring Cloud Bus | Planned |
-| Monitoring with Prometheus and Grafana | Planned, postponed until after Way B |
+| Monitoring with Prometheus and Grafana | Planned, postponed |
 | Experiment runner | Planned; this is the main measurement tool |
 | Angular dashboard | Planned, last |
