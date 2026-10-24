@@ -176,7 +176,7 @@ when I report Way B's numbers.
 | Watcher permissions | ClusterRole instead of a Role, so a reset of `thesis` does not remove them; it can read ConfigMaps and Secrets in every namespace, which is acceptable on a lab cluster only |
 | Fourth variant | Not needed for now: Reloader keeps Way A within the proposal's Variant A |
 
-These still need full entries in `docs/DECISIONS.md`.
+Recorded in full in [docs/DECISIONS.md](../../docs/DECISIONS.md).
 
 ## Next
 

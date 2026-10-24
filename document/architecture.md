@@ -19,7 +19,7 @@ The setup has three goals:
 
 ```mermaid
 flowchart LR
-    runner["Experiment runner<br/>(planned)<br/>one clock, constant rate"]
+    runner["Experiment runner<br/>one clock, constant rate"]
     curl["curl / browser<br/>(manual tests)"]
 
     subgraph mac["Developer machine"]
@@ -60,7 +60,7 @@ flowchart LR
 | Way B manifests | `deploy/way-b-volume/` | Same service, configuration mounted as files, ConfigMap labelled for the Watcher. |
 | Platform | `deploy/platform/` | Activation triggers that run across experiments: Reloader (Way A) and the Configuration Watcher (Way B). Installed once, never reset. Move in progress. |
 | Way C | `deploy/way-c-configserver/` | Planned: Config Server, RabbitMQ, Bus refresh. |
-| Experiment runner | `tools/experiment-runner/` (planned) | Load generator and measurement instrument. |
+| Experiment runner | `tools/experiment-runner/` | Measurement instrument. Stage 1: sends requests at a constant rate with a new connection each time and rejects runs where a pod went unobserved for more than 1 s. |
 
 ## The three configuration paths
 

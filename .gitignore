@@ -11,3 +11,4 @@ target/
 
 # Local Claude Code settings
 .claude/settings.local.json
+dependency-reduced-pom.xml
