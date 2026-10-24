@@ -29,7 +29,7 @@ public final class LoadGenerator {
 
         ScheduledExecutorService ticker = Executors.newSingleThreadScheduledExecutor();
         ticker.scheduleAtFixedRate(() -> {
-            double scheduledAt = clock.nowMillis();
+            double scheduledAt = clock.millisSinceStart();
             inFlight.add(client.probe(scheduled.getAndIncrement(), scheduledAt).thenAccept(observations::add));
         }, 0, periodNanos, TimeUnit.NANOSECONDS);
 

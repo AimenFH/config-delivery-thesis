@@ -1,4 +1,4 @@
-# 03: Experiment runner, stage 1
+# 03: Experiment runner, stages 1 and 2
 
 *October 2026, milestone 3 (in progress)*
 
@@ -13,8 +13,11 @@ request, the runner saw only one of three pods. At 20 requests per second, one p
 went unobserved for 1.25 seconds even though the shares looked even, so the default
 rate is now 50 requests per second.
 
-The runner does not yet save its data, change the configuration or detect the
-window. Those are stages 2 to 4.
+In stage 2 the runner started saving every observation to a file, so each result
+can be traced back to its raw data and analysed again later. It does not yet change
+the configuration or detect the window. Those are stages 3 and 4.
+
+Usage and file formats are in [document/runner.md](../runner.md).
 
 Reference material: [architecture](../architecture.md),
 [decisions](../../docs/DECISIONS.md), [previous entry](02-way-b-and-automatic-triggers.md).
@@ -85,6 +88,37 @@ than a second late. The check now looks at the longest gap per pod instead. That
 works for Way A, where old pods disappear halfway through a run and their share is
 naturally small.
 
+## Stage 2: saving the data
+
+Until stage 2 the runner printed a summary and then lost every observation. For the
+thesis every number has to be traceable to the measurements behind it, and the
+window detector in stage 4 needs input to read. Each run now writes two files to
+`results/raw/`, named after a run id made of the start time and a label:
+
+- `<run id>.ndjson` holds one JSON object per line, one line per request;
+- `<run id>.meta.json` holds the settings of the run and the coverage verdict.
+
+I chose NDJSON over one large JSON array or a CSV file. If a run is interrupted, a
+broken last line costs one row, while a missing closing bracket would make a whole
+JSON array unreadable. CSV has no clean way to carry missing values and loses types.
+
+The first version wrote absolute timestamps, and Jackson printed them as
+`1.792878637013595E12`. Correct, but unreadable, and every analysis would have had
+to subtract the start time first. `RunnerClock` now returns milliseconds since the
+run started, so a line reads `"scheduledAt":193.19`, and the absolute start time is
+stored once in the meta file. I also named that field `runStartedAt` instead of
+`startedAt`, because every observation already has a `startedAt` that means
+something else: when the pod started.
+
+Invalid runs are saved too, with `"valid": false` and the reasons. A test with
+`--replicas 4` against three pods was written to disk and marked
+`only 3 of 4 replicas were observed`. Throwing such runs away silently would hide how
+often the measurement failed.
+
+Raw data is not committed. A two-minute run at 50 requests per second produces 6 000
+lines, and the campaign will have 180 runs. `results/raw/` is in `.gitignore`; the
+aggregated tables and figures will be committed instead.
+
 ## What went wrong
 
 The `pom.xml` ended up inside the Java package folder instead of next to `src`,
@@ -100,6 +134,10 @@ existed.
 
 The shade plugin writes a `dependency-reduced-pom.xml` on every build. It is now in
 `.gitignore`.
+
+The run id uses the local time of the machine, while `runStartedAt` is in UTC. A run
+started at 00:58 local time shows 22:58 in the meta file. Both are correct, but it is
+easy to misread, so the runner documentation points it out.
 
 ## What I learned
 
@@ -122,14 +160,14 @@ start will show up as latency in the first seconds of every run.
 | Connection handling | `Connection: close` on every request over HTTP/1.1 |
 | Coverage rule | Every expected replica observed, longest gap per pod below 1 000 ms, otherwise exit code 2 |
 | Request rate | 50 req/s by default |
+| Raw data format | NDJSON per run plus a meta file, times in ms since run start, not committed |
 
 Recorded in full in [docs/DECISIONS.md](../../docs/DECISIONS.md).
 
 ## Next
 
-1. Stage 2: write every observation to an NDJSON file in `results/raw/`.
-2. Stage 3: let the runner apply the configuration change and record its time on the
+1. Stage 3: let the runner apply the configuration change and record its time on the
    runner's clock, after a warm-up period.
-3. Stage 4: detect the window from the data and test the detector with known inputs.
-4. Finish the move of both triggers into the `platform` namespace and measure the
+2. Stage 4: detect the window from the data and test the detector with known inputs.
+3. Finish the move of both triggers into the `platform` namespace and measure the
    kubelet delay before tuning `refreshDelay`.

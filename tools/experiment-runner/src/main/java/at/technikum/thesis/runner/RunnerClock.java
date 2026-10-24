@@ -1,16 +1,26 @@
 package at.technikum.thesis.runner;
 
+import java.time.Instant;
+
 public final class RunnerClock {
 
-    private final long anchorEpochMillis;
-    private final long anchorNanos;
+    private final long startEpochMillis;
+    private final long startNanos;
 
     public RunnerClock() {
-        this.anchorEpochMillis = System.currentTimeMillis();
-        this.anchorNanos = System.nanoTime();
+        this.startEpochMillis = System.currentTimeMillis();
+        this.startNanos = System.nanoTime();
     }
 
-    public double nowMillis() {
-        return anchorEpochMillis + (System.nanoTime() - anchorNanos) / 1_000_000.0;
+    public double millisSinceStart() {
+        return (System.nanoTime() - startNanos) / 1_000_000.0;
+    }
+
+    public long startEpochMillis() {
+        return startEpochMillis;
+    }
+
+    public String startIso() {
+        return Instant.ofEpochMilli(startEpochMillis).toString();
     }
 }

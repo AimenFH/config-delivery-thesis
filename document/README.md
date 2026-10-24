@@ -51,6 +51,7 @@ follow [the Way A runbook](runbook-way-a.md#3-run-the-experiment).
 | [Architecture](architecture.md) | understand how the setup is built and why |
 | [Probe service API](probe-api.md) | know what each endpoint returns |
 | [Runbook: Way A experiment](runbook-way-a.md) | run the experiment step by step, or fix a known error |
+| [Experiment runner](runner.md) | run the measurement tool, read its output files, understand the coverage check |
 | [Journal](journal/) | read what happened, what broke, and what I learned |
 | [Design decisions](../docs/DECISIONS.md) | see each decision with the alternatives I rejected |
 
@@ -66,5 +67,5 @@ follow [the Way A runbook](runbook-way-a.md#3-run-the-experiment).
 | Kubelet delay measured, `refreshDelay` tuned | Next |
 | Way C: Config Server and Spring Cloud Bus | Planned |
 | Monitoring with Prometheus and Grafana | Planned, postponed |
-| Experiment runner | Stage 1 working: constant-rate load and coverage check. Saving data, applying the change and window detection still to do |
+| Experiment runner | Stages 1 and 2 working: constant-rate load, coverage check, raw data saved per run. Applying the change and window detection still to do |
 | Angular dashboard | Planned, last |

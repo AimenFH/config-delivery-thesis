@@ -1,7 +1,10 @@
 package at.technikum.thesis.runner;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -18,8 +21,11 @@ public final class Runner {
         int seconds = Integer.parseInt(arg(args, "--duration", "10"));
         int replicas = Integer.parseInt(arg(args, "--replicas", "3"));
         double maxGap = Double.parseDouble(arg(args, "--max-gap-ms", "1000"));
+        String label = arg(args, "--label", "test");
+        Path out = Path.of(arg(args, "--out", "results/raw"));
 
         RunnerClock clock = new RunnerClock();
+        String runId = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + "_" + label;
         ProbeClient client = new ProbeClient(url, clock);
         LoadGenerator load = new LoadGenerator(client, clock, rate);
 
@@ -29,6 +35,15 @@ public final class Runner {
 
         CoverageCheck.Result coverage = new CoverageCheck(replicas, maxGap).check(observations);
         printCoverage(coverage);
+
+        RunResult result = new RunResult(runId, label, clock.startIso(), clock.startEpochMillis(),
+                url.toString(), rate, seconds, replicas, maxGap,
+                load.scheduledCount(), observations.size(),
+                observations.stream().filter(Observation::ok).count(),
+                coverage.valid(), coverage.problems());
+        Path written = new ResultWriter(out).write(result, observations);
+        System.out.println("Saved " + written.toAbsolutePath());
+
         if (!coverage.valid()) {
             System.exit(2);
         }

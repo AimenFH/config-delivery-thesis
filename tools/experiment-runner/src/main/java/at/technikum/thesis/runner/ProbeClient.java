@@ -33,10 +33,10 @@ public final class ProbeClient {
     }
 
     public CompletableFuture<Observation> probe(long seq, double scheduledAt) {
-        double sentAt = clock.nowMillis();
+        double sentAt = clock.millisSinceStart();
         return http.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .handle((response, failure) -> {
-                    double receivedAt = clock.nowMillis();
+                    double receivedAt = clock.millisSinceStart();
                     if (failure != null) {
                         return new Observation(seq, scheduledAt, sentAt, receivedAt, 0,
                                 null, null, 0, failure.getClass().getSimpleName());

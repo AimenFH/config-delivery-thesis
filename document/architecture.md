@@ -60,7 +60,7 @@ flowchart LR
 | Way B manifests | `deploy/way-b-volume/` | Same service, configuration mounted as files, ConfigMap labelled for the Watcher. |
 | Platform | `deploy/platform/` | Activation triggers that run across experiments: Reloader (Way A) and the Configuration Watcher (Way B). Installed once, never reset. Move in progress. |
 | Way C | `deploy/way-c-configserver/` | Planned: Config Server, RabbitMQ, Bus refresh. |
-| Experiment runner | `tools/experiment-runner/` | Measurement instrument. Stage 1: sends requests at a constant rate with a new connection each time and rejects runs where a pod went unobserved for more than 1 s. |
+| Experiment runner | `tools/experiment-runner/` | Measurement instrument: constant request rate, new connection per request, coverage check, raw data in `results/raw/`. See [Experiment runner](runner.md). |
 
 ## The three configuration paths
 

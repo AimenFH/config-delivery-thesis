@@ -321,6 +321,31 @@ version switch is detected about half a second late at most.
 
 ---
 
+## 2026-10-25 — Raw data as NDJSON per run, with times relative to the run start
+
+**Problem.** Every result in the thesis has to be traceable to the observations
+behind it, and the analysis must be repeatable without running the experiment
+again. Until stage 2 the runner printed a summary and discarded the observations.
+
+**Rejected.** One JSON array per run, which becomes unreadable as a whole if the run
+is interrupted before the closing bracket. CSV, which has no clean representation
+for missing values and loses types. Absolute epoch timestamps in every line, which
+Jackson writes as `1.792878637013595E12` and which every analysis would first have
+to convert.
+
+**Chosen.** Two files per run in `results/raw/`, named `<run id>.ndjson` and
+`<run id>.meta.json`. The NDJSON file holds one observation per line. Its times are
+milliseconds since the run started, on the runner's clock. The meta file holds the
+absolute start time (`runStartedAt`, UTC), all settings and the coverage verdict.
+Invalid runs are written as well, marked `"valid": false` with their reasons.
+`results/raw/` is not committed.
+
+**Cost.** Raw data lives only on the local machine and needs a separate backup. Two
+files belong together and must not be separated. Absolute times have to be
+reconstructed by adding `runStartedAtEpochMillis`.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>
