@@ -5,9 +5,12 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -23,29 +26,56 @@ public final class Runner {
         double maxGap = Double.parseDouble(arg(args, "--max-gap-ms", "1000"));
         String label = arg(args, "--label", "test");
         Path out = Path.of(arg(args, "--out", "results/raw"));
+        int warmup = Integer.parseInt(arg(args, "--warmup", "5"));
+        List<String> changeCommand = commandAfterSeparator(args);
 
         RunnerClock clock = new RunnerClock();
         String runId = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + "_" + label;
         ProbeClient client = new ProbeClient(url, clock);
         LoadGenerator load = new LoadGenerator(client, clock, rate);
 
-        System.out.printf("Probing %s at %d req/s for %d s%n", url, rate, seconds);
-        List<Observation> observations = load.run(Duration.ofSeconds(seconds));
+        System.out.printf("Probing %s at %d req/s: %d s warm-up, then %d s%n", url, rate, warmup, seconds);
+        CompletableFuture<ChangeTrigger.Result> change = changeCommand.isEmpty()
+                ? CompletableFuture.completedFuture(null)
+                : CompletableFuture.supplyAsync(new ChangeTrigger(changeCommand, clock)::fire,
+                        CompletableFuture.delayedExecutor(warmup, TimeUnit.SECONDS));
+        List<Observation> observations = load.run(Duration.ofSeconds(warmup + seconds));
+        ChangeTrigger.Result changeResult = change.join();
         printSummary(observations, load.scheduledCount());
+        printChange(changeResult);
 
         CoverageCheck.Result coverage = new CoverageCheck(replicas, maxGap).check(observations);
         printCoverage(coverage);
 
+        List<String> problems = new ArrayList<>(coverage.problems());
+        if (changeResult != null && changeResult.exitCode() != 0) {
+            problems.add("change command failed with exit code " + changeResult.exitCode() + ": " + changeResult.output());
+        }
+        boolean valid = problems.isEmpty();
+        printVerdict(valid, problems);
+
         RunResult result = new RunResult(runId, label, clock.startIso(), clock.startEpochMillis(),
-                url.toString(), rate, seconds, replicas, maxGap,
+                url.toString(), rate, seconds, warmup, replicas, maxGap,
                 load.scheduledCount(), observations.size(),
                 observations.stream().filter(Observation::ok).count(),
-                coverage.valid(), coverage.problems());
+                valid, problems, changeResult);
         Path written = new ResultWriter(out).write(result, observations);
         System.out.println("Saved " + written.toAbsolutePath());
 
-        if (!coverage.valid()) {
+        if (!valid) {
             System.exit(2);
+        }
+    }
+
+    private static void printChange(ChangeTrigger.Result change) {
+        if (change == null) {
+            System.out.println("Change: none");
+            return;
+        }
+        System.out.printf("Change: exit %d, started %.1f ms, finished %.1f ms%n",
+                change.exitCode(), change.startedAt(), change.finishedAt());
+        if (!change.output().isEmpty()) {
+            System.out.println("  " + change.output());
         }
     }
 
@@ -55,11 +85,14 @@ public final class Runner {
             System.out.printf("  %-40s %5d  (%4.1f %%)  longest unobserved %6.0f ms%n",
                     pod.pod(), pod.count(), 100 * pod.share(), pod.maxGapMillis());
         }
-        if (coverage.valid()) {
+    }
+
+    private static void printVerdict(boolean valid, List<String> problems) {
+        if (valid) {
             System.out.println("Run VALID");
         } else {
             System.out.println("Run INVALID");
-            coverage.problems().forEach(problem -> System.out.println("  - " + problem));
+            problems.forEach(problem -> System.out.println("  - " + problem));
         }
     }
 
@@ -92,11 +125,26 @@ public final class Runner {
     }
 
     private static String arg(String[] args, String name, String fallback) {
-        for (int i = 0; i < args.length - 1; i++) {
+        int end = separatorIndex(args);
+        for (int i = 0; i < end - 1; i++) {
             if (args[i].equals(name)) {
                 return args[i + 1];
             }
         }
         return fallback;
+    }
+
+    private static List<String> commandAfterSeparator(String[] args) {
+        int separator = separatorIndex(args);
+        return separator == args.length ? List.of() : List.of(args).subList(separator + 1, args.length);
+    }
+
+    private static int separatorIndex(String[] args) {
+        for (int i = 0; i < args.length; i++) {
+            if (args[i].equals("--")) {
+                return i;
+            }
+        }
+        return args.length;
     }
 }

@@ -10,12 +10,14 @@ public record RunResult(
         String url,
         int ratePerSecond,
         int durationSeconds,
+        int warmupSeconds,
         int expectedReplicas,
         double maxGapMillis,
         long scheduled,
         int recorded,
         long ok,
         boolean valid,
-        List<String> problems
+        List<String> problems,
+        ChangeTrigger.Result change
 ) {
 }
