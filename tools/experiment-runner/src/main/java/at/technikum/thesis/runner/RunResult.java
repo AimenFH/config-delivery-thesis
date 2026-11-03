@@ -18,6 +18,7 @@ public record RunResult(
         long ok,
         boolean valid,
         List<String> problems,
-        ChangeTrigger.Result change
+        ChangeTrigger.Result change,
+        WindowDetector.Result window
 ) {
 }

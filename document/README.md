@@ -67,5 +67,5 @@ follow [the Way A runbook](runbook-way-a.md#3-run-the-experiment).
 | Kubelet delay measured, `refreshDelay` tuned | Next |
 | Way C: Config Server and Spring Cloud Bus | Planned |
 | Monitoring with Prometheus and Grafana | Planned, postponed |
-| Experiment runner | Stages 1 and 2 working: constant-rate load, coverage check, raw data saved per run. Applying the change and window detection still to do |
+| Experiment runner | Working: constant-rate load, coverage check, raw data per run, change applied after a warm-up, window detected and unit tested |
 | Angular dashboard | Planned, last |

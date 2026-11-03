@@ -51,6 +51,12 @@ public final class Runner {
         if (changeResult != null && changeResult.exitCode() != 0) {
             problems.add("change command failed with exit code " + changeResult.exitCode() + ": " + changeResult.output());
         }
+        WindowDetector.Result window = changeResult == null ? null
+                : new WindowDetector(maxGap).detect(observations, changeResult);
+        if (window != null) {
+            printWindow(window);
+            problems.addAll(window.problems());
+        }
         boolean valid = problems.isEmpty();
         printVerdict(valid, problems);
 
@@ -58,7 +64,7 @@ public final class Runner {
                 url.toString(), rate, seconds, warmup, replicas, maxGap,
                 load.scheduledCount(), observations.size(),
                 observations.stream().filter(Observation::ok).count(),
-                valid, problems, changeResult);
+                valid, problems, changeResult, window);
         Path written = new ResultWriter(out).write(result, observations);
         System.out.println("Saved " + written.toAbsolutePath());
 
@@ -77,6 +83,21 @@ public final class Runner {
         if (!change.output().isEmpty()) {
             System.out.println("  " + change.output());
         }
+    }
+
+    private static void printWindow(WindowDetector.Result window) {
+        System.out.printf("Window: %s -> %s%n", window.oldVersion(), window.newVersion());
+        if (window.windowMillis() == null) {
+            System.out.println("  not measurable");
+            return;
+        }
+        System.out.printf("  first new    %10.1f ms  (propagation %.1f ms after the change)%n",
+                window.firstNewAt(), window.propagationMillis());
+        System.out.printf("  last old     %10.1f ms  (convergence %.1f ms after the change)%n",
+                window.lastOldAt(), window.convergenceMillis());
+        System.out.printf("  window       %10.1f ms  (at most %.1f ms)%n",
+                window.windowMillis(), window.windowMaxMillis());
+        System.out.printf("  failed requests after the change: %d%n", window.failedAfterChange());
     }
 
     private static void printCoverage(CoverageCheck.Result coverage) {

@@ -346,6 +346,66 @@ reconstructed by adding `runStartedAtEpochMillis`.
 
 ---
 
+## 2026-11-03 — The runner applies the change itself, after a warm-up
+
+**Problem.** The window can only be measured against the moment of the change, and
+that moment has to be on the runner's clock. The first seconds of every run also
+show the runner's own JVM warming up, which must not overlap with the change.
+
+**Rejected.** Applying the change by hand in a second terminal, whose time is not on
+the runner's clock and which cannot be repeated exactly. Passing the command as one
+string and splitting it on spaces, which breaks the quoted JSON of a `kubectl patch`.
+
+**Chosen.** The runner probes for `--warmup` seconds (default 5) and then runs the
+command given after a bare `--` as a child process, while the load continues. It
+records `startedAt` and `finishedAt` of that process on its clock. A command with a
+non-zero exit code makes the run invalid. Without `--` the run has no change, which
+gives baseline runs.
+
+**Cost.** `finishedAt` includes starting `kubectl` and its round trip to the API
+server, so the moment of the change is only known to within
+`finishedAt - startedAt`. The warm-up timer starts after the runner has set itself
+up, so the change fires about 200 ms later than `--warmup` says. The recorded times
+are the real ones.
+
+---
+
+## 2026-11-03 — Inconsistency window: last old answer minus first new answer
+
+**Problem.** The thesis needs one definition of the window that works for both a
+refresh in place (Way B) and a rolling restart that replaces pods (Way A), and that
+says how precise each number is.
+
+**Rejected.** Averaging per-pod switch times, which hides the overlap the thesis is
+about. Measuring from the change to the last old answer, which mixes the delivery
+delay with the inconsistency itself. Using `sentAt` for some boundaries and
+`receivedAt` for others, which makes the numbers harder to explain for a gain
+smaller than the p99 latency.
+
+**Chosen.** All boundaries use `receivedAt`. The old version is the only version
+seen before the change, the new version the first other version after it.
+
+| Quantity | Definition |
+|---|---|
+| Window | `max(0, last old - first new)`: how long both versions were served |
+| Window, upper bound | Window plus the unobserved time before the first new answer on its pod and after the last old answer on its pod |
+| Propagation | `first new - change finishedAt` |
+| Convergence | `max(last old, first new) - change finishedAt` |
+
+A pod that has no earlier or later observation, because it is new or was removed,
+counts with `--max-gap-ms` as its unobserved time. A run is invalid if the warm-up
+shows more than one version, if the new version never appears, if a pod still
+serving at the end of the run (observed within the last `--max-gap-ms`) answers with
+the old version, or if a pod answers with the old version on a request sent after it
+had already answered with the new one. All failed requests after the change are
+counted, up to the end of the run. A first Way A run showed the last burst of
+failures 2 s after the last old answer, outside any limit tied to convergence.
+
+**Cost.** The measured window is a lower bound. The upper bound for new and removed
+pods rests on the assumption that the coverage rule holds for them too.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>

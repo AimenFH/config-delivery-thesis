@@ -9,6 +9,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executors;
 
 public final class ProbeClient {
@@ -39,7 +40,7 @@ public final class ProbeClient {
                     double receivedAt = clock.millisSinceStart();
                     if (failure != null) {
                         return new Observation(seq, scheduledAt, sentAt, receivedAt, 0,
-                                null, null, 0, failure.getClass().getSimpleName());
+                                null, null, 0, describe(failure));
                     }
                     try {
                         JsonNode body = json.readTree(response.body());
@@ -53,5 +54,14 @@ public final class ProbeClient {
                                 null, null, 0, "BadBody");
                     }
                 });
+    }
+
+    private static String describe(Throwable failure) {
+        Throwable cause = failure;
+        while (cause instanceof CompletionException && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        String name = cause.getClass().getSimpleName();
+        return cause.getMessage() == null ? name : name + ": " + cause.getMessage();
     }
 }
