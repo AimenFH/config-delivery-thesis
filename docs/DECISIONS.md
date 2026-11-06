@@ -256,6 +256,17 @@ careful first value. In the first test the Watcher detected the change at
 Way A in the first test. The value will be replaced by the slowest measured kubelet
 delay plus a margin, and this entry updated.
 
+**Update 2026-11-06.** I measured the kubelet delay with
+`tools/kubelet-delay.sh`, which patches the ConfigMap and reads the mounted file
+in every pod every 0.5 s until it changes. Ten changes on three pods gave 30
+values between 9.2 s and 77.6 s, with a median of 31.8 s. The slowest pod per
+change took between 29.4 s and 77.6 s. The data is in `results/kubelet-delay.txt`.
+The slowest value plus a margin of 10 s is 88 s, which saves 2 s against 90 s and
+leaves a smaller margin. The value stays at 90 s, now 12.4 s above the slowest
+measurement instead of a guess. Thirty values do not prove an upper bound, so a
+pod still on the old version at the end of a Way B run is the first thing to
+check against this delay.
+
 ---
 
 ## 2026-10-18 — Activation triggers run in a separate platform namespace
