@@ -125,6 +125,27 @@ as `v1` from the file.
 kind delete cluster --name thesis
 ```
 
+## Switching between Way A and Way B
+
+Delete the Deployment first, so nothing from the other Way is left behind:
+
+```bash
+kubectl -n thesis delete deployment probe-service && kubectl apply -f deploy/way-a-envvar/
+```
+
+Use `deploy/way-b-volume/` to go the other way. Applying the folder on top of a
+running Deployment lets Reloader add `STAKATER_DEMO_CONFIG_CONFIGMAP` to the pods,
+and `kubectl apply` does not remove it again.
+
+Check that the Deployment only has the variables of its own Way:
+
+```bash
+kubectl -n thesis get deploy probe-service -o jsonpath='{.spec.template.spec.containers[0].env[*].name}'
+```
+
+Way A prints `DEMO_VALUE DEMO_CONFIGVERSION DEMO_TIMEOUTMS`, Way B prints
+`SPRING_CONFIG_IMPORT`.
+
 ## Troubleshooting
 
 | Symptom | Cause | Fix |

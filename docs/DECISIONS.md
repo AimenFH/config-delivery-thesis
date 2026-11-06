@@ -406,6 +406,29 @@ pods rests on the assumption that the coverage rule holds for them too.
 
 ---
 
+## 2026-11-06 — Way A pods wait 5 seconds before shutting down
+
+**Problem.** During a Way A rollout, about a third of the requests sent in the
+0.7 s after an old pod was told to stop got no answer and timed out after 2 s:
+41 and 33 failed requests in two runs. kube-proxy still routed new connections
+to the pod while it was already shutting down.
+
+**Rejected.** Measuring Way A without a shutdown delay as the main
+configuration. The failures come from how pods are removed, not from how the
+configuration is delivered, and a production deployment would not accept them.
+Increasing the runner's timeout, which only hides the failures.
+
+**Chosen.** A `preStop` sleep of 5 s on the Way A container, using the built-in
+sleep action. Two runs with it had no failed requests. The runs without it stay
+in the journal as a variant.
+
+**Cost.** Each old pod now answers for 0.6 to 1.0 s after its replacement
+appears, with the old version, so the window grows by up to about 1 s per
+handover (14.9 s and 16.9 s against 13.9 s). Each pod also takes 5 s longer to
+stop.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>

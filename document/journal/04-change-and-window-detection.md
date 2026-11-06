@@ -114,6 +114,30 @@ to a pod for a short time after it started shutting down. Connect and request
 timeout are both 2 s, so the data does not show whether those connections were
 accepted.
 
+### Way A with a shutdown delay
+
+I added a `preStop` sleep of 5 s to the Way A container and ran the same change
+twice.
+
+| | Without `preStop` | With `preStop` |
+|---|---|---|
+| Failed requests | 41, 33 | 0, 0 |
+| Window | 13.9 s, 13.9 s | 14.9 s, 16.9 s |
+| Old pod still answering after its replacement appears | 0 ms | 0.6 to 1.0 s |
+
+The requests that used to hang now reach a pod that still answers, with the old
+version. The failures are gone, and the window is longer by up to about 1 s per
+handover. Two runs per variant are not enough to say how much of the difference
+is spread between runs.
+
+### Switching between Ways leaves traces
+
+When I switched from Way A back to Way B with `kubectl apply`, Reloader saw the
+ConfigMap change while the Deployment still had its annotation, and added
+`STAKATER_DEMO_CONFIG_CONFIGMAP` to the Way B pods. `kubectl apply` does not
+remove a field it did not write. I now delete the Deployment before applying
+the other Way.
+
 ## What I learned
 
 The instrument had the same blind spot the thesis is about: a change that is
@@ -136,14 +160,14 @@ end of the run.
 | Window definition | Last old answer minus first new answer on `receivedAt`, at least 0, with an upper bound from the unobserved time on the boundary pods |
 | Validity | Mixed warm-up, missing switch, old version at the end, or a regression make a run invalid |
 | Failed requests | Counted from the change to the end of the run |
+| Way A shutdown | `preStop` sleep of 5 s, so no requests fail while old pods stop |
 
 Recorded in full in [docs/DECISIONS.md](../../docs/DECISIONS.md).
 
 ## Next
 
-1. Decide whether Way A gets a `preStop` delay, so a pod keeps answering until
-   kube-proxy has removed it, or whether the failed requests stay part of what
-   Way A costs. Record the choice in DECISIONS.
+1. Repeat both Way A variants often enough to see whether the longer window
+   with `preStop` is more than spread between runs.
 2. Repeat both Ways often enough to report a spread instead of single values.
 3. Finish the move of both triggers into the `platform` namespace and measure the
    kubelet delay before tuning `refreshDelay`.
