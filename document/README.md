@@ -61,11 +61,12 @@ follow [the Way A runbook](runbook-way-a.md#3-run-the-experiment).
 |---|---|
 | Probe service | Working |
 | Local cluster (kind, 1 control plane and 3 workers) | Working |
-| Way A: environment variables and rolling restart | Working; restart triggered automatically by Reloader |
+| Way A: environment variables and rolling restart | Working; restart triggered automatically by Reloader, 5 s `preStop` delay so no requests fail |
 | Way B: mounted ConfigMap and runtime refresh | Working; refresh triggered automatically by the Configuration Watcher |
-| Shared `platform` namespace for both triggers | In progress |
-| Kubelet delay measured, `refreshDelay` tuned | Next |
+| Shared `platform` namespace for both triggers | Working; the Watcher discovers pods in `thesis` |
+| Kubelet delay measured, `refreshDelay` tuned | Done: 9.2 s to 77.6 s over 30 values, `refreshDelay` stays at 90 s |
 | Way C: Config Server and Spring Cloud Bus | Planned |
 | Monitoring with Prometheus and Grafana | Planned, postponed |
 | Experiment runner | Working: constant-rate load, coverage check, raw data per run, change applied after a warm-up, window detected and unit tested |
+| Repeated runs of Way A and Way B | Next |
 | Angular dashboard | Planned, last |
