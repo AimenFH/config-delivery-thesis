@@ -49,6 +49,8 @@ spec:
               value: thesis
             - name: SPRING_CLOUD_KUBERNETES_CONFIGURATION_WATCHER_REFRESHDELAY
               value: "90000"
+            - name: SPRING_CLOUD_KUBERNETES_DISCOVERY_NAMESPACES_0
+              value: thesis
           resources:
             requests: {cpu: "250m", memory: "512Mi"}
             limits:   {cpu: "1", memory: "1Gi"}
