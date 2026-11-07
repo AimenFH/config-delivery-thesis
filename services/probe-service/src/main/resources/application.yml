@@ -1,6 +1,16 @@
 spring:
   application:
     name: probe-service
+  cloud:
+    config:
+      enabled: ${CONFIG_CLIENT_ENABLED:false}
+    bus:
+      enabled: ${BUS_ENABLED:false}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:rabbitmq.platform.svc}
+    port: 5672
+    username: ${RABBITMQ_USER:thesis}
+    password: ${RABBITMQ_PASSWORD:thesis}
 
 demo:
   value: "UNSET"
@@ -15,6 +25,9 @@ management:
   endpoint:
     health:
       show-details: always
+  health:
+    rabbit:
+      enabled: ${BUS_ENABLED:false}
 
 server:
   shutdown: graceful

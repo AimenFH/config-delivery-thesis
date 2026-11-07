@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: probe-service
+  namespace: thesis
+spec:
+  replicas: 3
+  selector:
+    matchLabels: {app: probe-service}
+  template:
+    metadata:
+      labels: {app: probe-service}
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+          matchLabelKeys: [pod-template-hash]
+          labelSelector:
+            matchLabels: { app: probe-service }
+      containers:
+        - name: probe
+          image: probe-service:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8080}]
+          env:
+            - name: SPRING_CONFIG_IMPORT
+              value: "configserver:http://config-server.platform.svc:8888"
+            - name: CONFIG_CLIENT_ENABLED
+              value: "true"
+            - name: BUS_ENABLED
+              value: "true"
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 8080}
+            periodSeconds: 2
+          resources:
+            requests: {cpu: "250m", memory: "384Mi"}
+            limits:   {cpu: "500m", memory: "512Mi"}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: probe-service
+  namespace: thesis
+spec:
+  type: NodePort
+  selector: { app: probe-service }
+  ports: [ { port: 80, targetPort: 8080, nodePort: 30080 } ]
