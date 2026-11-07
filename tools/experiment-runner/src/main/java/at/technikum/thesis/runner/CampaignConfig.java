@@ -23,11 +23,19 @@ public record CampaignConfig(
             String name,
             String manifests,
             String versionKey,
+            List<String> changeCommand,
             int warmupSeconds,
             int durationSeconds,
             int settleSeconds,
             int pauseSeconds
     ) {
+
+        public List<String> changeFor(String version) {
+            if (changeCommand == null) {
+                return ClusterControl.patchCommand(versionKey, version);
+            }
+            return changeCommand.stream().map(part -> part.replace("{version}", version)).toList();
+        }
     }
 
     public static CampaignConfig read(Path file) throws IOException {
@@ -71,8 +79,14 @@ public record CampaignConfig(
             return problems;
         }
         for (Way way : ways) {
-            if (way.name() == null || way.manifests() == null || way.versionKey() == null) {
-                problems.add("every way needs name, manifests and versionKey");
+            if (way.name() == null || way.manifests() == null) {
+                problems.add("every way needs name and manifests");
+            }
+            if ((way.versionKey() == null) == (way.changeCommand() == null)) {
+                problems.add("way " + way.name() + ": needs either versionKey or changeCommand");
+            }
+            if (way.changeCommand() != null && way.changeCommand().stream().noneMatch(p -> p.contains("{version}"))) {
+                problems.add("way " + way.name() + ": changeCommand must contain {version}");
             }
             if (way.durationSeconds() < 1) {
                 problems.add("way " + way.name() + ": durationSeconds must be at least 1");

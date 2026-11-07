@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -31,20 +32,22 @@ public final class Campaign {
                 campaignId, config.ways().size(), config.repetitions(), config.maxAttempts(), dir.toAbsolutePath());
 
         List<Summary.Entry> entries = new ArrayList<>();
+        long versionBase = Instant.now().getEpochSecond();
+        int changes = 0;
         int exitCode = 0;
         try {
             for (CampaignConfig.Way way : config.ways()) {
                 prepare(way);
                 int valid = 0;
                 for (int attempt = 1; attempt <= config.maxAttempts() && valid < config.repetitions(); attempt++) {
-                    String version = "v" + (100 + attempt);
+                    String version = version(versionBase, ++changes);
                     String label = String.format("%s-r%02d", way.name(), attempt);
                     System.out.printf("%n== %s, attempt %d of at most %d (%d of %d valid so far), change to %s%n",
                             way.name(), attempt, config.maxAttempts(), valid, config.repetitions(), version);
                     awaitSteady(way, false);
                     RunResult result = Runner.run(new RunSettings(config.uri(), config.ratePerSecond(),
                             way.durationSeconds(), way.warmupSeconds(), config.expectedReplicas(),
-                            config.maxGapMillis(), label, dir, ClusterControl.patchCommand(way.versionKey(), version)));
+                            config.maxGapMillis(), label, dir, way.changeFor(version)));
                     entries.add(new Summary.Entry(way.name(), result));
                     if (result.valid()) {
                         valid++;
@@ -70,6 +73,10 @@ public final class Campaign {
             exitCode = 2;
         }
         return exitCode;
+    }
+
+    static String version(long base, int change) {
+        return "v" + (base + change);
     }
 
     private void prepare(CampaignConfig.Way way) throws InterruptedException {

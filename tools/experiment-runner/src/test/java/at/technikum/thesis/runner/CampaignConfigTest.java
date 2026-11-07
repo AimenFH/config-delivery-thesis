@@ -22,8 +22,8 @@ class CampaignConfigTest {
         assertEquals("smoke", config.name());
         assertEquals(2, config.repetitions());
         assertEquals(4, config.maxAttempts());
-        assertEquals(2, config.ways().size());
-        CampaignConfig.Way wayB = config.ways().get(1);
+        assertEquals(List.of("way-a", "way-c", "way-b"), config.ways().stream().map(CampaignConfig.Way::name).toList());
+        CampaignConfig.Way wayB = config.ways().get(2);
         assertEquals("demo.configVersion", wayB.versionKey());
         assertEquals(100, wayB.settleSeconds());
     }
@@ -38,7 +38,7 @@ class CampaignConfigTest {
 
     @Test
     void reportsFewerAttemptsThanRepetitions() {
-        CampaignConfig.Way way = new CampaignConfig.Way("way-a", "deploy/way-a-envvar", "configVersion", 5, 90, 30, 60);
+        CampaignConfig.Way way = new CampaignConfig.Way("way-a", "deploy/way-a-envvar", "configVersion", null, 5, 90, 30, 60);
         CampaignConfig config = new CampaignConfig("test", 15, 10, "http://localhost:30080/probe", 50, 3, 1000, List.of(way));
 
         assertEquals(List.of("maxAttempts must be at least repetitions"), config.problems());
@@ -57,12 +57,13 @@ class CampaignConfigTest {
 
     @Test
     void reportsAnIncompleteWay() {
-        CampaignConfig.Way way = new CampaignConfig.Way("way-x", null, null, 5, 0, 0, 0);
+        CampaignConfig.Way way = new CampaignConfig.Way("way-x", null, null, null, 5, 0, 0, 0);
         CampaignConfig config = new CampaignConfig("test", 1, 1, "http://localhost:30080/probe", 50, 3, 1000, List.of(way));
 
         List<String> problems = config.problems();
 
-        assertTrue(problems.contains("every way needs name, manifests and versionKey"), problems.toString());
+        assertTrue(problems.contains("every way needs name and manifests"), problems.toString());
+        assertTrue(problems.contains("way way-x: needs either versionKey or changeCommand"), problems.toString());
         assertTrue(problems.contains("way way-x: durationSeconds must be at least 1"), problems.toString());
     }
 
@@ -72,5 +73,39 @@ class CampaignConfigTest {
         Files.writeString(file, "{\"name\":\"bad\",\"repetitions\":0,\"ways\":[]}");
 
         assertThrows(IllegalArgumentException.class, () -> CampaignConfig.read(file));
+    }
+
+    @Test
+    void wayCRunsItsScriptWithTheVersion() throws Exception {
+        CampaignConfig.Way wayC = CampaignConfig.read(CAMPAIGNS.resolve("smoke.json")).ways().get(1);
+
+        assertEquals(List.of("bash", "tools/way-c-change.sh", "v123"), wayC.changeFor("v123"));
+    }
+
+    @Test
+    void wayWithVersionKeyPatchesTheConfigMap() {
+        CampaignConfig.Way way = new CampaignConfig.Way("way-a", "deploy/way-a-envvar", "configVersion", null, 5, 90, 30, 60);
+
+        assertEquals(ClusterControl.patchCommand("configVersion", "v7"), way.changeFor("v7"));
+    }
+
+    @Test
+    void reportsBothOrNeitherChangeMethodAndAMissingPlaceholder() {
+        CampaignConfig.Way both = new CampaignConfig.Way("both", "m", "configVersion", List.of("x", "{version}"), 5, 90, 0, 0);
+        CampaignConfig.Way noPlaceholder = new CampaignConfig.Way("fixed", "m", null, List.of("bash", "x.sh", "v1"), 5, 90, 0, 0);
+        CampaignConfig config = new CampaignConfig("test", 1, 1, "http://localhost:30080/probe", 50, 3, 1000,
+                List.of(both, noPlaceholder));
+
+        List<String> problems = config.problems();
+
+        assertTrue(problems.contains("way both: needs either versionKey or changeCommand"), problems.toString());
+        assertTrue(problems.contains("way fixed: changeCommand must contain {version}"), problems.toString());
+    }
+
+    @Test
+    void versionsGrowWithEveryChangeAndAreValidVersionNames() {
+        assertEquals("v1794100001", Campaign.version(1794100000L, 1));
+        assertEquals("v1794100002", Campaign.version(1794100000L, 2));
+        assertTrue(Campaign.version(1794100000L, 1).matches("v\\d+"));
     }
 }

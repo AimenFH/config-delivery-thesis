@@ -17,6 +17,15 @@
       "pauseSeconds": 60
     },
     {
+      "name": "way-c",
+      "manifests": "deploy/way-c-configserver",
+      "changeCommand": ["bash", "tools/way-c-change.sh", "{version}"],
+      "warmupSeconds": 5,
+      "durationSeconds": 30,
+      "settleSeconds": 30,
+      "pauseSeconds": 30
+    },
+    {
       "name": "way-b",
       "manifests": "deploy/way-b-volume",
       "versionKey": "demo.configVersion",
