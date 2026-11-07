@@ -440,6 +440,30 @@ stop.
 
 ---
 
+## 2026-11-07 — Coverage stays strict for the whole run; campaigns repeat invalid runs
+
+**Problem.** In a smoke campaign, one new Way A pod stopped answering for 1.3 s at
+72 s into the run, about 45 s after all pods had switched. Its answers were slow,
+not lost. The coverage rule marked the run invalid although the gap came after
+convergence and could not hide a version switch. With a fixed number of runs per
+Way, every invalid run also leaves the campaign one result short.
+
+**Rejected.** Checking coverage only up to convergence plus 1 s. It would have kept
+that run, but it makes the rule depend on the detector's result and is harder to
+explain. Accepting fewer valid runs than planned, which makes the sample size differ
+between Ways by chance.
+
+**Chosen.** The coverage rule stays as it is: a gap over `--max-gap-ms` anywhere in
+the run makes it invalid. A campaign repeats runs until each Way has `repetitions`
+valid runs, with at most `maxAttempts` attempts per Way (15 and 20 for scenario 1).
+Invalid runs stay on disk and are counted in the summary.
+
+**Cost.** Longer campaigns, by one run of up to about 3 minutes per rejected
+attempt. If invalid runs cluster in one Way, the rejection rate itself is a
+result and has to be reported.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>

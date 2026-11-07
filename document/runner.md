@@ -6,7 +6,8 @@ checks that every replica was observed often enough, and saves every observation
 to a file. The probe service is the object under study; the runner only observes it.
 
 Status: all four stages are done. The runner can apply a configuration change
-after a warm-up and computes the inconsistency window from its own observations.
+after a warm-up, computes the inconsistency window from its own observations, and
+can run a whole campaign of repeated runs over several Ways.
 
 ## Quick start
 
@@ -76,6 +77,7 @@ block.
 | `--label` | `test` | Free text that becomes part of the run id, for example `way-b` |
 | `--out` | `results/raw` | Folder for the output files, relative to where you start the runner |
 | `-- <command>` | none | Everything after a bare `--` is the change command, run once after the warm-up. Without it the run has no change |
+| `--campaign <file>` | none | Runs a whole campaign from a JSON file instead of a single run. All other arguments are ignored. See [Campaigns](#campaigns) |
 
 ## Exit codes
 
@@ -84,6 +86,10 @@ block.
 | `0` | The run is valid |
 | `2` | The run is invalid. Its files are still written, with `"valid": false` and the reasons |
 | other | The runner itself failed, for example a wrong argument |
+
+With `--campaign`, the codes mean: `0` every Way reached its number of valid runs,
+`2` at least one Way did not, `1` the campaign stopped early, for example because a
+switch failed or a Way never became steady.
 
 ## Output files
 
@@ -163,6 +169,90 @@ when the new version was never observed.
 
 `runStartedAt` is in UTC, while the run id uses the local time of the machine. In
 the example, 00:58 local time is 22:58 UTC.
+
+## Campaigns
+
+A campaign repeats runs over several Ways without supervision. It switches the
+cluster to each Way, waits until the pods are steady, runs until it has enough
+valid runs, and writes a summary.
+
+Run it on a quiet machine: no games, no builds, plugged in. `caffeinate` keeps
+macOS from sleeping during a long campaign:
+
+```bash
+caffeinate -dims java -jar tools/experiment-runner/target/experiment-runner.jar --campaign campaigns/smoke.json
+```
+
+`campaigns/smoke.json` needs 2 valid runs per Way and takes about 15 minutes.
+`campaigns/scenario-1.json` needs 15 and takes about 1.5 to 2 hours.
+
+### Campaign file
+
+```json
+{
+  "name": "smoke",
+  "repetitions": 2,
+  "maxAttempts": 4,
+  "url": "http://localhost:30080/probe",
+  "ratePerSecond": 50,
+  "expectedReplicas": 3,
+  "maxGapMillis": 1000,
+  "ways": [
+    {
+      "name": "way-a",
+      "manifests": "deploy/way-a-envvar",
+      "versionKey": "configVersion",
+      "warmupSeconds": 5,
+      "durationSeconds": 90,
+      "settleSeconds": 30,
+      "pauseSeconds": 60
+    }
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `repetitions` | Valid runs needed per Way |
+| `maxAttempts` | Attempts allowed per Way, at least `repetitions` |
+| `manifests` | Folder applied when switching to this Way |
+| `versionKey` | ConfigMap key the change patches: `configVersion` for Way A, `demo.configVersion` for Way B |
+| `settleSeconds` | Wait after switching. Way B needs more than `refreshDelay`, because applying its ConfigMap schedules a Watcher refresh |
+| `pauseSeconds` | Wait after each run, so the previous rollout or refresh is over |
+
+The file is checked before anything starts. A missing or wrong field stops the
+runner with the reason.
+
+### What a campaign does
+
+1. Creates `results/raw/<date-time>_<name>/` and saves a copy of the campaign file
+   in it as `campaign.json`.
+2. For each Way, in the order of the file:
+   1. Deletes the Deployment, applies `manifests`, and waits for `rollout status`.
+   2. Waits `settleSeconds`, then until 60 requests reach every expected pod, all
+      with one version, no failures, and every answer under 200 ms. If that does
+      not happen within 120 s, the campaign stops.
+   3. Runs until `repetitions` runs are valid or `maxAttempts` are used. Each
+      attempt changes to a new version (`v101`, `v102`, ...) and is labelled
+      `<way>-r01`, `<way>-r02`, ...
+3. Prints min, median and max per Way over the valid runs, and writes them to
+   `summary.csv`.
+
+The manifests reset the version to `v1`, so every Way starts from the same state.
+Put Way B last to leave the cluster on Way B.
+
+### Summary
+
+```
+Campaign summary (valid runs only)
+  way-a: 2 runs, 2 valid
+    metric                 n          min       median          max
+    propagationMillis      2       7422.0       7475.8       7529.7
+    windowMillis           2      14734.8      14803.5      14872.2
+```
+
+`summary.csv` has one line per Way and metric: `way,metric,n,min,median,max`.
+Invalid runs are counted in "runs" and left out of the numbers.
 
 ## The coverage check
 
@@ -249,6 +339,11 @@ flowchart LR
 | `WindowDetector` | Finds the old and new version, computes window, propagation and convergence, and checks the run for regressions or a missing switch |
 | `RunResult` | Settings and verdict of a run, written as the meta file |
 | `ResultWriter` | Writes the NDJSON and the meta file |
+| `RunSettings` | Settings of one run, filled from the arguments or from a campaign |
+| `CampaignConfig` | Reads and checks a campaign file |
+| `ClusterControl` | Switches Ways with `kubectl` and checks that the pods are steady |
+| `Campaign` | Runs the Ways and attempts and collects the results |
+| `Summary` | Min, median and max per Way, printed and written as `summary.csv` |
 
 Three choices make the numbers trustworthy:
 

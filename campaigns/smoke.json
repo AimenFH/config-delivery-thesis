@@ -1,0 +1,29 @@
+{
+  "name": "smoke",
+  "repetitions": 2,
+  "maxAttempts": 4,
+  "url": "http://localhost:30080/probe",
+  "ratePerSecond": 50,
+  "expectedReplicas": 3,
+  "maxGapMillis": 1000,
+  "ways": [
+    {
+      "name": "way-a",
+      "manifests": "deploy/way-a-envvar",
+      "versionKey": "configVersion",
+      "warmupSeconds": 5,
+      "durationSeconds": 90,
+      "settleSeconds": 30,
+      "pauseSeconds": 60
+    },
+    {
+      "name": "way-b",
+      "manifests": "deploy/way-b-volume",
+      "versionKey": "demo.configVersion",
+      "warmupSeconds": 5,
+      "durationSeconds": 150,
+      "settleSeconds": 100,
+      "pauseSeconds": 30
+    }
+  ]
+}

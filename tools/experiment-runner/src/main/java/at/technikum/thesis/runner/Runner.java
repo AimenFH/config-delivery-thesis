@@ -19,32 +19,46 @@ public final class Runner {
     public static void main(String[] args) throws Exception {
         System.setProperty("jdk.httpclient.allowRestrictedHeaders", "connection");
 
-        URI url = URI.create(arg(args, "--url", "http://localhost:30080/probe"));
-        int rate = Integer.parseInt(arg(args, "--rate", "50"));
-        int seconds = Integer.parseInt(arg(args, "--duration", "10"));
-        int replicas = Integer.parseInt(arg(args, "--replicas", "3"));
-        double maxGap = Double.parseDouble(arg(args, "--max-gap-ms", "1000"));
-        String label = arg(args, "--label", "test");
-        Path out = Path.of(arg(args, "--out", "results/raw"));
-        int warmup = Integer.parseInt(arg(args, "--warmup", "5"));
-        List<String> changeCommand = commandAfterSeparator(args);
+        String campaign = arg(args, "--campaign", null);
+        if (campaign != null) {
+            System.exit(new Campaign(CampaignConfig.read(Path.of(campaign))).run());
+        }
 
+        RunSettings settings = new RunSettings(
+                URI.create(arg(args, "--url", "http://localhost:30080/probe")),
+                Integer.parseInt(arg(args, "--rate", "50")),
+                Integer.parseInt(arg(args, "--duration", "10")),
+                Integer.parseInt(arg(args, "--warmup", "5")),
+                Integer.parseInt(arg(args, "--replicas", "3")),
+                Double.parseDouble(arg(args, "--max-gap-ms", "1000")),
+                arg(args, "--label", "test"),
+                Path.of(arg(args, "--out", "results/raw")),
+                commandAfterSeparator(args));
+
+        if (!run(settings).valid()) {
+            System.exit(2);
+        }
+    }
+
+    public static RunResult run(RunSettings settings) throws Exception {
         RunnerClock clock = new RunnerClock();
-        String runId = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + "_" + label;
-        ProbeClient client = new ProbeClient(url, clock);
-        LoadGenerator load = new LoadGenerator(client, clock, rate);
+        String runId = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")) + "_" + settings.label();
+        ProbeClient client = new ProbeClient(settings.url(), clock);
+        LoadGenerator load = new LoadGenerator(client, clock, settings.ratePerSecond());
 
-        System.out.printf("Probing %s at %d req/s: %d s warm-up, then %d s%n", url, rate, warmup, seconds);
-        CompletableFuture<ChangeTrigger.Result> change = changeCommand.isEmpty()
+        System.out.printf("Probing %s at %d req/s: %d s warm-up, then %d s%n",
+                settings.url(), settings.ratePerSecond(), settings.warmupSeconds(), settings.durationSeconds());
+        CompletableFuture<ChangeTrigger.Result> change = settings.changeCommand().isEmpty()
                 ? CompletableFuture.completedFuture(null)
-                : CompletableFuture.supplyAsync(new ChangeTrigger(changeCommand, clock)::fire,
-                        CompletableFuture.delayedExecutor(warmup, TimeUnit.SECONDS));
-        List<Observation> observations = load.run(Duration.ofSeconds(warmup + seconds));
+                : CompletableFuture.supplyAsync(new ChangeTrigger(settings.changeCommand(), clock)::fire,
+                        CompletableFuture.delayedExecutor(settings.warmupSeconds(), TimeUnit.SECONDS));
+        List<Observation> observations = load.run(Duration.ofSeconds(settings.warmupSeconds() + settings.durationSeconds()));
         ChangeTrigger.Result changeResult = change.join();
         printSummary(observations, load.scheduledCount());
         printChange(changeResult);
 
-        CoverageCheck.Result coverage = new CoverageCheck(replicas, maxGap).check(observations);
+        CoverageCheck.Result coverage = new CoverageCheck(settings.expectedReplicas(), settings.maxGapMillis())
+                .check(observations);
         printCoverage(coverage);
 
         List<String> problems = new ArrayList<>(coverage.problems());
@@ -52,7 +66,7 @@ public final class Runner {
             problems.add("change command failed with exit code " + changeResult.exitCode() + ": " + changeResult.output());
         }
         WindowDetector.Result window = changeResult == null ? null
-                : new WindowDetector(maxGap).detect(observations, changeResult);
+                : new WindowDetector(settings.maxGapMillis()).detect(observations, changeResult);
         if (window != null) {
             printWindow(window);
             problems.addAll(window.problems());
@@ -60,17 +74,15 @@ public final class Runner {
         boolean valid = problems.isEmpty();
         printVerdict(valid, problems);
 
-        RunResult result = new RunResult(runId, label, clock.startIso(), clock.startEpochMillis(),
-                url.toString(), rate, seconds, warmup, replicas, maxGap,
+        RunResult result = new RunResult(runId, settings.label(), clock.startIso(), clock.startEpochMillis(),
+                settings.url().toString(), settings.ratePerSecond(), settings.durationSeconds(),
+                settings.warmupSeconds(), settings.expectedReplicas(), settings.maxGapMillis(),
                 load.scheduledCount(), observations.size(),
                 observations.stream().filter(Observation::ok).count(),
                 valid, problems, changeResult, window);
-        Path written = new ResultWriter(out).write(result, observations);
+        Path written = new ResultWriter(settings.out()).write(result, observations);
         System.out.println("Saved " + written.toAbsolutePath());
-
-        if (!valid) {
-            System.exit(2);
-        }
+        return result;
     }
 
     private static void printChange(ChangeTrigger.Result change) {
