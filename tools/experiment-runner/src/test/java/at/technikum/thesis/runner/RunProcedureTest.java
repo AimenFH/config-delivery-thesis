@@ -57,6 +57,8 @@ class RunProcedureTest {
                 GET_DEPLOYMENT,
                 GET_SERVICE,
                 GET_WORKLOAD_PODS,
+                GET_SERVER,
+                GET_RABBIT,
                 "probe 60",
                 "wait 10000 until 110350",
                 "probe 60",

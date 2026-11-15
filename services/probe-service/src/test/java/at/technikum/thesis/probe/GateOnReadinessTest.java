@@ -105,6 +105,34 @@ class GateOnReadinessTest {
     }
 
     @Test
+    void gate_on_configVersion_v_without_a_number_does_not_match_v_number_readiness_is_503() {
+        try (RunningProbe probe = gateOn("demo.configVersion=v")) {
+            assertNotReady(probe, "v", "demo.configVersion='v' does not match v<number>");
+        }
+    }
+
+    @Test
+    void gate_on_configVersion_v2x_with_text_after_the_number_does_not_match_v_number_readiness_is_503() {
+        try (RunningProbe probe = gateOn("demo.configVersion=v2x")) {
+            assertNotReady(probe, "v2x", "demo.configVersion='v2x' does not match v<number>");
+        }
+    }
+
+    @Test
+    void gate_on_configVersion_V2_with_a_capital_letter_does_not_match_v_number_readiness_is_503() {
+        try (RunningProbe probe = gateOn("demo.configVersion=V2")) {
+            assertNotReady(probe, "V2", "demo.configVersion='V2' does not match v<number>");
+        }
+    }
+
+    @Test
+    void gate_on_configVersion_v10_with_two_digits_matches_v_number_readiness_is_200() {
+        try (RunningProbe probe = gateOn("demo.configVersion=v10")) {
+            assertReady(probe, "v10");
+        }
+    }
+
+    @Test
     void gate_on_readiness_body_shows_no_more_than_the_status() {
         try (RunningProbe probe = gateOn("demo.timeoutMs=abc")) {
             assertEquals("{\"status\":\"DOWN\"}", probe.get("/actuator/health/readiness").body());

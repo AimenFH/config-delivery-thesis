@@ -87,6 +87,7 @@ final class Fakes {
         final ObjectNode service = resource("invariants/service.json");
         final ObjectNode pods = resource("invariants/pods.json");
         final Map<String, Integer> replicas = new LinkedHashMap<>();
+        final Map<String, Integer> readyReplicas = new LinkedHashMap<>();
         Predicate<String> fails = command -> false;
         Predicate<String> throwsOn = command -> false;
         Consumer<String> onCommand = command -> {
@@ -144,7 +145,10 @@ final class Fakes {
             if (argv.get(3).equals("get") && argv.get(4).equals("deployment")) {
                 ObjectNode infra = Fixtures.JSON.createObjectNode();
                 ObjectNode spec = infra.putObject("spec");
-                spec.put("replicas", replicas.getOrDefault(namespace + "/" + argv.get(5), 1));
+                int desired = replicas.getOrDefault(namespace + "/" + argv.get(5), 1);
+                spec.put("replicas", desired);
+                infra.putObject("status").put("readyReplicas",
+                        readyReplicas.getOrDefault(namespace + "/" + argv.get(5), desired));
                 ObjectNode container = spec.putObject("template").putObject("spec").putArray("containers")
                         .addObject();
                 container.put("name", argv.get(5));

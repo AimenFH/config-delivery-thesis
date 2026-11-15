@@ -1,5 +1,6 @@
 package at.technikum.thesis.runner;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -160,6 +161,20 @@ class StepExecutorTest {
         assertEquals(0, record.exitCode());
         assertEquals(150_000, record.startedAt());
         assertEquals(DELETE_POD, record.action());
+    }
+
+    @Test
+    void delete_pod_deletes_the_alphabetically_first_pod_when_the_pod_list_is_not_sorted() throws Exception {
+        ArrayNode items = (ArrayNode) kubectl.pods.get("items");
+        items.add(items.remove(0));
+        assertEquals(List.of("probe-service-f664c8f55-jfsxk", "probe-service-f664c8f55-ldcdv",
+                "probe-service-f664c8f55-7hfd6"), names(items));
+
+        RunRecord.StepRecord record = executor().execute(2, new Scenario.Step(60, DELETE_POD, null));
+
+        assertEquals(List.of(GET_PODS, DELETE_FIRST_POD), log);
+        assertEquals("probe-service-f664c8f55-7hfd6", record.detail());
+        assertEquals(0, record.exitCode());
     }
 
     @Test
@@ -380,6 +395,43 @@ class StepExecutorTest {
     }
 
     @Test
+    void after_a_restore_that_fails_the_timeline_of_the_complete_run_is_still_available() throws Exception {
+        kubectl.fails = command -> command.contains("rollout status deployment/rabbitmq");
+        Scenario scenario = Scenario.read(Fixtures.ROOT.resolve("scenarios/s3-infra-outage.json"));
+        StepExecutor executor = executor();
+
+        assertThrows(CampaignStopped.class, () -> executor.run(scenario, stopMeasurement));
+
+        assertEquals(List.of(INFRA_DOWN, COMMIT, DELETE_POD, INFRA_UP),
+                executor.completed().steps().stream().map(RunRecord.StepRecord::action).toList());
+        assertEquals(360_000, executor.completed().runEndAt());
+    }
+
+    @Test
+    void after_a_failed_core_step_there_is_no_timeline_of_a_complete_run() throws Exception {
+        kubectl.fails = command -> command.contains("delete pod");
+        Scenario scenario = Scenario.read(Fixtures.ROOT.resolve("scenarios/s3-infra-outage.json"));
+        StepExecutor executor = executor();
+
+        assertThrows(CampaignStopped.class, () -> executor.run(scenario, stopMeasurement));
+
+        assertNull(executor.completed());
+    }
+
+    @Test
+    void a_complete_run_whose_measurement_could_not_be_stopped_has_no_timeline_of_a_complete_run()
+            throws Exception {
+        Scenario scenario = Scenario.read(Fixtures.ROOT.resolve("scenarios/s1-valid-change.json"));
+        StepExecutor executor = executor();
+
+        assertThrows(IllegalArgumentException.class, () -> executor.run(scenario, () -> {
+            throw new IllegalArgumentException("stop failed in the test");
+        }));
+
+        assertNull(executor.completed());
+    }
+
+    @Test
     void a_failing_stop_of_the_measurement_does_not_prevent_the_restore() throws Exception {
         Scenario scenario = Scenario.read(Fixtures.ROOT.resolve("scenarios/s3-infra-outage.json"));
         kubectl.throwsOn = command -> command.contains("delete pod");
@@ -390,6 +442,12 @@ class StepExecutorTest {
 
         assertEquals(List.of(DELETE_FIRST_POD, SCALE_SERVER_BACK, SCALE_RABBIT_BACK, READY_SERVER, READY_RABBIT),
                 log.subList(log.indexOf(DELETE_FIRST_POD), log.size()));
+    }
+
+    private static List<String> names(ArrayNode items) {
+        List<String> names = new ArrayList<>();
+        items.forEach(item -> names.add(item.path("metadata").path("name").asText()));
+        return names;
     }
 
     private StepExecutor executor() throws Exception {

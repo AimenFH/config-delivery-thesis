@@ -124,6 +124,25 @@ class StatisticsTest {
     }
 
     @Test
+    void the_interval_is_the_95_percent_percentile_interval_from_the_2_5th_to_the_97_5th_percentile() {
+        assertEquals(0.025, Statistics.INTERVAL_LOW);
+        assertEquals(0.975, Statistics.INTERVAL_HIGH);
+        assertArrayEquals(new double[]{7, 7},
+                Statistics.medianInterval(new double[]{7, 7, 7, 7, 7, 7, 7, 7, 7, 7}, 10_000, 20261115));
+        assertArrayEquals(new double[]{7 - 4, 7 - 4},
+                Statistics.medianDifferenceInterval(new double[]{7, 7, 7}, new double[]{4, 4}, 10_000, 20261115));
+    }
+
+    @Test
+    void the_95_percent_interval_leaves_out_a_resampled_median_that_occurs_in_fewer_than_2_5_percent_of_the_resamples() {
+        double[] nineFivesAndOneOutlier = {5, 5, 5, 5, 5, 5, 5, 5, 5, 1_000};
+
+        double[] interval = Statistics.medianInterval(nineFivesAndOneOutlier, 10_000, 20261115);
+
+        assertArrayEquals(new double[]{5, 5}, interval);
+    }
+
+    @Test
     void a_bootstrap_bound_that_lands_on_a_censored_value_is_censored() {
         double[] interval = Statistics.medianInterval(new double[]{100, CENSORED, CENSORED, CENSORED}, 1_000, 1);
 

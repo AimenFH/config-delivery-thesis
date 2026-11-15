@@ -1,5 +1,6 @@
 package at.technikum.thesis.runner;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,7 +23,8 @@ public interface ServiceProbe {
         return new ServiceProbe() {
             @Override
             public List<Observation> probe(int count, RunnerClock clock) {
-                ProbeClient client = new ProbeClient(protocol.uri(), clock);
+                ProbeClient client = new ProbeClient(protocol.uri(), clock,
+                        Duration.ofMillis(protocol.requestTimeoutMillis()));
                 List<Observation> observations = new ArrayList<>();
                 for (int i = 0; i < count; i++) {
                     double now = clock.millisSinceStart();
@@ -33,8 +35,8 @@ public interface ServiceProbe {
 
             @Override
             public Load startLoad(RunnerClock clock) {
-                LoadGenerator generator = new LoadGenerator(new ProbeClient(protocol.uri(), clock), clock,
-                        protocol.ratePerSecond());
+                LoadGenerator generator = new LoadGenerator(new ProbeClient(protocol.uri(), clock,
+                        Duration.ofMillis(protocol.requestTimeoutMillis())), clock, protocol.ratePerSecond());
                 generator.start();
                 return new Load() {
                     @Override

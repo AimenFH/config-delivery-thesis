@@ -68,7 +68,7 @@ class EvaluateCampaignTest {
         List<RunMetrics> metrics = Evaluator.evaluateCampaign(dir);
 
         List<String> lines = Files.readAllLines(dir.resolve("runs.csv"));
-        assertEquals("run_id,approach,block,position,attempt,verdict,reasons,flags,"
+        assertEquals("protocolVersion,run_id,approach,block,position,attempt,verdict,reasons,flags,"
                 + "P1,P2,P3,C1,C1_max,C2,C3,A1,A2,A3,F1,"
                 + "F2_p50_B,F2_p95_B,F2_p99_B,F2_max_B,F2_p50_H,F2_p95_H,F2_p99_H,F2_max_H,F2_p99_ratio,F3,"
                 + "O1,O2,O3_cpu,O3_memory,O4,O5_extraComponents,O5_extraComponents_text,O5_operatorActions,"
@@ -76,9 +76,11 @@ class EvaluateCampaignTest {
         assertEquals(List.of("20261115-200100_b01_way-a", "20261115-200800_b01_way-b", "20261115-201500_b01_way-c",
                         "20261115-202200_b02_way-b", "20261115-202900_b02_way-b", "20261115-203600_b02_way-a",
                         "20261115-204300_b02_way-c"),
-                lines.subList(1, lines.size()).stream().map(line -> line.substring(0, line.indexOf(','))).toList());
-        assertEquals(lines.subList(1, lines.size()).stream().map(line -> line.substring(0, line.indexOf(','))).toList(),
+                lines.subList(1, lines.size()).stream().map(line -> line.split(",")[1]).toList());
+        assertEquals(lines.subList(1, lines.size()).stream().map(line -> line.split(",")[1]).toList(),
                 metrics.stream().map(RunMetrics::runId).toList());
+        assertEquals(List.of("1", "1", "1", "1", "1", "1", "1"),
+                lines.subList(1, lines.size()).stream().map(line -> line.split(",")[0]).toList());
     }
 
     @Test
@@ -89,7 +91,7 @@ class EvaluateCampaignTest {
         Evaluator.evaluateCampaign(dir);
 
         List<String> lines = Files.readAllLines(dir.resolve("runs.csv"));
-        assertTrue(lines.get(1).startsWith("20261115-200100_b01_way-a,way-a,1,1,1,VALID,,,"
+        assertTrue(lines.get(1).startsWith("1,20261115-200100_b01_way-a,way-a,1,1,1,VALID,,,"
                 + "5342,4942,100,400,520,7,0,0,0,3,-75,2,2,2,2,2,2,2,2,1,2,"), lines.get(1));
         assertTrue(lines.get(1).endsWith(",64,150,768,0,1,Stakater Reloader,1,1,"
                 + "\"none, values read at process start\",reloader-reloader=10m,reloader-reloader=64Mi")
@@ -105,11 +107,11 @@ class EvaluateCampaignTest {
         Evaluator.evaluateCampaign(dir);
 
         List<String> lines = Files.readAllLines(dir.resolve("runs.csv"));
-        assertTrue(lines.get(2).startsWith("20261115-200800_b01_way-b,way-b,1,2,1,VALID,,NOT_CONVERGED,"
+        assertTrue(lines.get(2).startsWith("1,20261115-200800_b01_way-b,way-b,1,2,1,VALID,,NOT_CONVERGED,"
                 + ">150000,4902,100,144980,"), lines.get(2));
-        assertTrue(lines.get(4).startsWith("20261115-202200_b02_way-b,way-b,2,1,1,INVALID,"
+        assertTrue(lines.get(4).startsWith("1,20261115-202200_b02_way-b,way-b,2,1,1,INVALID,"
                 + "baseline: 1 failed requests,,"), lines.get(4));
-        assertTrue(lines.get(5).startsWith("20261115-202900_b02_way-b,way-b,2,1,2,VALID,,,"), lines.get(5));
+        assertTrue(lines.get(5).startsWith("1,20261115-202900_b02_way-b,way-b,2,1,2,VALID,,,"), lines.get(5));
     }
 
     @Test
@@ -131,19 +133,69 @@ class EvaluateCampaignTest {
         Evaluator.evaluateCampaign(dir);
 
         List<String> lines = Files.readAllLines(dir.resolve("summary.csv"));
-        assertEquals(String.join(",", Summary.HEADER), lines.get(0));
-        assertTrue(lines.contains("count,way-b,,runs,3,,,,,,,,,,"), lines.toString());
-        assertTrue(lines.contains("count,way-b,,valid,2,,,,,,,,,,"));
-        assertTrue(lines.contains("count,way-b,,invalid,1,,,,,,,,,,"));
-        assertTrue(lines.contains("count,way-b,,NOT_CONVERGED,1,,,,,,,,,,"));
-        assertTrue(lines.stream().anyMatch(line -> line.startsWith("metric,way-a,,P1,2,,0,4902,5012,5122,5232,5342,")),
+        assertEquals("protocolVersion,kind,approach,other,metric,n,n_other,censored,min,q1,median,q3,max,"
+                + "ci_low,ci_high,cliffs_delta", lines.get(0));
+        assertTrue(lines.subList(1, lines.size()).stream().allMatch(line -> line.startsWith("1,")));
+        assertTrue(lines.contains("1,count,way-b,,runs,3,,,,,,,,,,"), lines.toString());
+        assertTrue(lines.contains("1,count,way-b,,valid,2,,,,,,,,,,"));
+        assertTrue(lines.contains("1,count,way-b,,invalid,1,,,,,,,,,,"));
+        assertTrue(lines.contains("1,count,way-b,,NOT_CONVERGED,1,,,,,,,,,,"));
+        assertTrue(lines.stream().anyMatch(line -> line.startsWith("1,metric,way-a,,P1,2,,0,4902,5012,5122,5232,5342,")),
                 lines.toString());
         assertTrue(lines.stream().anyMatch(line ->
-                line.startsWith("metric,way-b,,P1,2,,1,4902,censored,censored,censored,censored,")));
-        assertTrue(lines.stream().anyMatch(line -> line.startsWith("difference,way-a,way-c,P1,2,2,0,,,110,,,")),
+                line.startsWith("1,metric,way-b,,P1,2,,1,4902,censored,censored,censored,censored,")));
+        assertTrue(lines.stream().anyMatch(line -> line.startsWith("1,difference,way-a,way-c,P1,2,2,0,,,110,,,")),
                 lines.toString());
-        assertTrue(lines.stream().anyMatch(line -> line.startsWith("sensitivity,way-b,,A1,3,,0,0,0,0,0,0,0,0,")));
+        assertTrue(lines.stream().anyMatch(line -> line.startsWith("1,sensitivity,way-b,,A1,3,,0,0,0,0,0,0,0,0,")));
         assertEquals(1 + 3 * 9 + 3 * 32 + 7 * 3 + 3 * 2, lines.size());
+    }
+
+    @Test
+    void summary_csv_is_bootstrapped_with_the_resamples_and_the_seed_of_the_protocol_in_the_campaign_file(
+            @TempDir Path seed7, @TempDir Path seed7Again, @TempDir Path seed8) throws Exception {
+        spreadOutCampaign(seed7, 20, 7);
+        spreadOutCampaign(seed7Again, 20, 7);
+        spreadOutCampaign(seed8, 20, 8);
+
+        Evaluator.evaluateCampaign(seed7);
+        Evaluator.evaluateCampaign(seed7Again);
+        Evaluator.evaluateCampaign(seed8);
+
+        double[] p1 = {1_902, 2_902, 4_902, 5_902, 9_902, 13_902, 14_902, 19_902, 29_902, 39_902};
+        double[] with7 = Statistics.medianInterval(p1, 20, Statistics.seed(7, "way-a", "P1"));
+        double[] with8 = Statistics.medianInterval(p1, 20, Statistics.seed(8, "way-a", "P1"));
+        String start = "1,metric,way-a,,P1,10,,0,1902,5152,11902,18652,39902,";
+        assertEquals(start + Csv.number(with7[0]) + "," + Csv.number(with7[1]) + ",", p1Row(seed7));
+        assertEquals(start + Csv.number(with8[0]) + "," + Csv.number(with8[1]) + ",", p1Row(seed8));
+        assertFalse(p1Row(seed7).equals(p1Row(seed8)), p1Row(seed7));
+        assertArrayEquals(Files.readAllBytes(seed7.resolve("summary.csv")),
+                Files.readAllBytes(seed7Again.resolve("summary.csv")));
+    }
+
+    private static String p1Row(Path dir) throws Exception {
+        return Files.readAllLines(dir.resolve("summary.csv")).stream()
+                .filter(line -> line.startsWith("1,metric,way-a,,P1,")).findFirst().orElseThrow();
+    }
+
+    private static void spreadOutCampaign(Path dir, int resamples, long seed) throws Exception {
+        CampaignConfig.Loaded loaded = CampaignConfig.read(Fixtures.ROOT.resolve("campaigns/s1.json"))
+                .load(Fixtures.ROOT);
+        Protocol protocol = Fixtures.protocolWith(tree -> tree.put("bootstrapResamples", resamples)
+                .put("bootstrapSeed", seed));
+        CampaignRecord campaign = new CampaignRecord("20261115-200000_s1", loaded.config(), protocol,
+                loaded.scenario(), List.of("way-a"), List.of(List.of("way-a")));
+        Fixtures.JSON.writerWithDefaultPrettyPrinter().writeValue(dir.resolve("campaign.json").toFile(), campaign);
+        Files.createDirectories(dir.resolve("approaches"));
+        Files.copy(Fixtures.ROOT.resolve("approaches/way-a/approach.json"), dir.resolve("approaches/way-a.json"));
+
+        Evaluator evaluator = new Evaluator(protocol, loaded.scenario(), loaded.approaches());
+        ResultWriter store = new ResultWriter(dir);
+        double[] switchAt = {92_000, 93_000, 95_000, 96_000, 100_000, 104_000, 105_000, 110_000, 120_000, 130_000};
+        for (int i = 0; i < switchAt.length; i++) {
+            RunRecord record = run("20261115-2001" + (10 + i) + "_b01_way-a", "way-a", 1 + i, 1, 1,
+                    load(0, 12_000, TestRuns.allSwitchAt(switchAt[i], "v1", "v2")));
+            store.save(record, evaluator.evaluate(record));
+        }
     }
 
     private static void campaign(Path dir) throws Exception {

@@ -1,5 +1,6 @@
 package at.technikum.thesis.runner;
 
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -11,6 +12,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -50,26 +52,38 @@ public final class Runner {
         }
 
         static RunJudge judge(CampaignConfig.Loaded loaded) {
-            throw new UnsupportedOperationException("wired in phase 3");
+            return new Evaluator(loaded.protocol(), loaded.scenario(), loaded.approaches());
         }
 
         static RunStore store(CampaignConfig.Loaded loaded, Path campaignDirectory) {
-            throw new UnsupportedOperationException("wired in phase 3");
+            return new ResultWriter(campaignDirectory);
         }
 
         static Sampler sampler(CampaignConfig.Loaded loaded) {
-            throw new UnsupportedOperationException("wired in phase 3");
+            return new ResourceSampler(loaded.protocol().resourceSamplingSeconds(), CommandRunner.process());
         }
 
-        static int evaluate(Path campaignDirectory) {
-            throw new UnsupportedOperationException("wired in phase 3");
+        static int evaluate(Path campaignDirectory) throws IOException {
+            List<RunMetrics> runs = Evaluator.evaluateCampaign(campaignDirectory);
+            long valid = runs.stream().filter(run -> run.verdict() == RunMetrics.Verdict.VALID).count();
+            System.out.printf("Evaluated %d runs (%d valid) in %s%n", runs.size(), valid, campaignDirectory.toAbsolutePath());
+            System.out.println("Saved " + campaignDirectory.resolve(Evaluator.RUNS_FILE).toAbsolutePath());
+            System.out.println("Saved " + campaignDirectory.resolve(Evaluator.SUMMARY_FILE).toAbsolutePath());
+            return 0;
         }
     }
 
     static int campaign(Path file) throws Exception {
         CampaignConfig.Loaded loaded = CampaignConfig.read(file).load();
-        return new Campaign(loaded, () -> Wiring.sampler(loaded), Wiring.judge(loaded),
-                directory -> Wiring.store(loaded, directory)).run();
+        AtomicReference<Path> campaignDirectory = new AtomicReference<>();
+        int exitCode = new Campaign(loaded, () -> Wiring.sampler(loaded), Wiring.judge(loaded), directory -> {
+            campaignDirectory.set(directory);
+            return Wiring.store(loaded, directory);
+        }).run();
+        if (campaignDirectory.get() != null) {
+            Wiring.evaluate(campaignDirectory.get());
+        }
+        return exitCode;
     }
 
     public static RunResult run(RunSettings settings) throws Exception {
@@ -105,6 +119,9 @@ public final class Runner {
         }
         boolean valid = problems.isEmpty();
         printVerdict(valid, problems);
+        if (window != null && !window.flags().isEmpty()) {
+            System.out.println("Flags: " + window.flags().stream().map(Enum::name).collect(Collectors.joining(" ")));
+        }
 
         RunResult result = new RunResult(runId, settings.label(), clock.startIso(), clock.startEpochMillis(),
                 settings.url().toString(), settings.ratePerSecond(), settings.durationSeconds(),

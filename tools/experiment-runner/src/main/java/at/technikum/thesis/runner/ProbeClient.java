@@ -20,15 +20,19 @@ public final class ProbeClient {
     private final ObjectMapper json = new ObjectMapper();
 
     public ProbeClient(URI url, RunnerClock clock) {
+        this(url, clock, Duration.ofSeconds(2));
+    }
+
+    public ProbeClient(URI url, RunnerClock clock, Duration timeout) {
         this.clock = clock;
         this.http = HttpClient.newBuilder()
                 .version(HttpClient.Version.HTTP_1_1)
-                .connectTimeout(Duration.ofSeconds(2))
+                .connectTimeout(timeout)
                 .executor(Executors.newVirtualThreadPerTaskExecutor())
                 .build();
         this.request = HttpRequest.newBuilder(url)
                 .header("Connection", "close")
-                .timeout(Duration.ofSeconds(2))
+                .timeout(timeout)
                 .GET()
                 .build();
     }

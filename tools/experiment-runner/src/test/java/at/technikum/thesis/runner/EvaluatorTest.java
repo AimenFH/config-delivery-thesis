@@ -434,6 +434,84 @@ class EvaluatorTest {
     }
 
     @Test
+    void check_7_a_node_of_the_pod_list_after_the_run_without_any_sample_makes_the_run_invalid() {
+        RunRecord record = withPods(TestRuns.s1(cleanS1()), List.of(pod(A, "thesis-worker")),
+                List.of(pod(A, "thesis-worker"), pod(D, "thesis-worker2")));
+
+        RunMetrics metrics = s1.evaluate(record);
+
+        assertEquals(INVALID, metrics.verdict());
+        assertEquals(List.of("resource sampling: node thesis-worker2 runs pods of the pod list and has no sample"),
+                metrics.invalidReasons());
+    }
+
+    @Test
+    void check_7_a_node_of_the_pod_list_before_the_run_without_any_sample_makes_the_run_invalid() {
+        RunRecord record = withPods(TestRuns.s1(cleanS1()),
+                List.of(pod(A, "thesis-worker"), pod(D, "thesis-worker3")), List.of(pod(A, "thesis-worker")));
+
+        RunMetrics metrics = s1.evaluate(record);
+
+        assertEquals(INVALID, metrics.verdict());
+        assertEquals(List.of("resource sampling: node thesis-worker3 runs pods of the pod list and has no sample"),
+                metrics.invalidReasons());
+    }
+
+    @Test
+    void check_7_a_node_of_the_pod_list_with_a_sample_every_5_s_leaves_the_run_valid() {
+        List<ResourceSample> resources = new ArrayList<>(samples(0, 240_000));
+        for (double at = 0; at <= 240_000; at += 5_000) {
+            resources.add(new ResourceSample(at, "thesis-worker2", "thesis", D, "probe", 1, 1, 0));
+        }
+        RunRecord record = withPods(TestRuns.s1(cleanS1(), resources), List.of(pod(A, "thesis-worker")),
+                List.of(pod(A, "thesis-worker"), pod(D, "thesis-worker2")));
+
+        RunMetrics metrics = s1.evaluate(record);
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+    }
+
+    @Test
+    void check_7_with_empty_pod_lists_only_the_nodes_of_the_samples_are_checked() {
+        List<ResourceSample> gap = samples(0, 240_000).stream()
+                .filter(s -> s.at() != 100_000 && s.at() != 105_000)
+                .map(s -> s.at() == 110_000 ? at(s, 110_001) : s).toList();
+
+        RunMetrics clean = s1.evaluate(withPods(TestRuns.s1(cleanS1()), List.of(), List.of()));
+        RunMetrics withGap = s1.evaluate(withPods(TestRuns.s1(cleanS1(), gap), List.of(), List.of()));
+        RunMetrics withoutSamples = s1.evaluate(withPods(TestRuns.s1(cleanS1(), List.of()), List.of(), List.of()));
+
+        assertEquals(VALID, clean.verdict(), clean.invalidReasons().toString());
+        assertEquals(List.of("resource sampling: node thesis-worker has a gap of 15001 ms (limit 15 s)"),
+                withGap.invalidReasons());
+        assertEquals(List.of("no resource samples"), withoutSamples.invalidReasons());
+    }
+
+    @Test
+    void check_7_a_pod_without_a_node_names_no_node_to_check() {
+        RunRecord record = withPods(TestRuns.s1(cleanS1()), List.of(pod(A, "thesis-worker")),
+                List.of(pod(A, "thesis-worker"), pod(D, null)));
+
+        RunMetrics metrics = s1.evaluate(record);
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+    }
+
+    private static RunRecord.PodInfo pod(String name, String node) {
+        return new RunRecord.PodInfo("thesis", name, node, "sha256:1234", "2026-11-15T20:00:00Z");
+    }
+
+    private static RunRecord withPods(RunRecord record, List<RunRecord.PodInfo> before,
+                                      List<RunRecord.PodInfo> after) {
+        return new RunRecord(record.runId(), record.campaign(), record.approach(), record.scenario(),
+                record.protocolVersion(), record.block(), record.positionInBlock(), record.attempt(),
+                record.runStartedAt(), record.runStartedAtEpochMillis(), record.gate(), record.loadStartedAt(),
+                record.runEndAt(), record.scheduled(), record.sourceCheck(), record.steps(), record.observations(),
+                record.resources(), new RunRecord.ClusterState(before, after, record.cluster().infrastructure(),
+                record.cluster().events()), record.errors());
+    }
+
+    @Test
     void a_run_without_convergence_is_valid_with_the_flag_NOT_CONVERGED_and_a_censored_p1() {
         List<Observation> observations = load(0, 12_000,
                 (pod, at) -> pod.equals(C) || at < 95_000 ? "v1" : "v2");
@@ -481,7 +559,7 @@ class EvaluatorTest {
     }
 
     @Test
-    void a1_counts_the_requests_of_H_while_FAILED_REQUESTS_looks_at_the_whole_run_after_the_baseline() {
+    void FAILED_REQUESTS_is_set_exactly_when_a1_is_above_0_so_a_failed_request_after_H_sets_no_flag() {
         List<Observation> observations = replace(load(0, 12_100, TestRuns.allSwitchAt(95_000, "v1", "v2")),
                 failure(12_050));
         RunRecord record = TestRuns.run("run-1", "way-a", "s1-valid-change", 1, 1, 1,
@@ -492,6 +570,20 @@ class EvaluatorTest {
         assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
         assertEquals(0, value(metrics, "A1"));
         assertEquals(0, value(metrics, "A2"));
+        assertEquals(Set.of(), metrics.flags());
+    }
+
+    @Test
+    void FAILED_REQUESTS_is_set_for_a_failed_request_in_the_last_tick_of_H_where_a1_is_above_0() {
+        List<Observation> observations = replace(load(0, 12_100, TestRuns.allSwitchAt(95_000, "v1", "v2")),
+                failure(11_999));
+        RunRecord record = TestRuns.run("run-1", "way-a", "s1-valid-change", 1, 1, 1,
+                List.of(commit(0, 0, V2, 90_000, 90_100)), observations, samples(0, 245_000), 242_000);
+
+        RunMetrics metrics = s1.evaluate(record);
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(1.0 / 7_500, value(metrics, "A1"));
         assertEquals(Set.of(FAILED_REQUESTS), metrics.flags());
     }
 
@@ -509,6 +601,28 @@ class EvaluatorTest {
 
         assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
         assertEquals(Set.of(), metrics.flags());
+    }
+
+    @Test
+    void LOW_RESOLUTION_a_coverage_gap_around_the_switch_widens_c1_max_and_a1_and_f2_still_count_in_full() {
+        List<Observation> observations = reroute(staggeredSwitch(), 4_773, 4_823, C, B);
+
+        RunMetrics metrics = s1.evaluate(TestRuns.s1(observations));
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(Set.of(LOW_RESOLUTION), metrics.flags());
+        assertEquals(95_442 - 95_042, value(metrics, "C1"));
+        assertEquals(400 + 60 + (96_462 - 95_442), value(metrics, "C1_max"));
+        assertTrue(value(metrics, "C1_max") > 520);
+        assertEquals(95_442 - 90_100, value(metrics, "P1"));
+        assertEquals(0, value(metrics, "A1"));
+        assertEquals(0, value(metrics, "A2"));
+        assertEquals(3, value(metrics, "A3"));
+        for (String column : List.of("F2_p50_B", "F2_p95_B", "F2_p99_B", "F2_max_B",
+                "F2_p50_H", "F2_p95_H", "F2_p99_H", "F2_max_H")) {
+            assertEquals(2, value(metrics, column), column);
+        }
+        assertEquals(1, value(metrics, "F2_p99_ratio"));
     }
 
     @Test
@@ -573,6 +687,35 @@ class EvaluatorTest {
         assertEquals(100, value(metrics, "E3_outage"));
         assertEquals(2, value(metrics, "E4"));
         assertEquals(new Metric(MetricId.R1, "R1", 215_982.0 - 210_080, false, null), metric(metrics, "R1"));
+    }
+
+    @Test
+    void s2_e3_counts_a_failed_request_exactly_at_the_start_of_the_bad_commit() {
+        RunMetrics metrics = s2.evaluate(s2Run(replace(s2WithoutExposure(), failure(4_500))));
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(1.0 / 6_000, value(metrics, "E3_ratio"));
+        assertEquals(20, value(metrics, "E3_outage"));
+    }
+
+    @Test
+    void s2_e3_does_not_count_a_failed_request_exactly_at_the_start_of_the_fix_commit() {
+        RunMetrics metrics = s2.evaluate(s2Run(replace(s2WithoutExposure(), failure(10_500))));
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(0, value(metrics, "E3_ratio"));
+        assertEquals(0, value(metrics, "E3_outage"));
+        assertTrue(metrics.flags().contains(FAILED_REQUESTS));
+    }
+
+    @Test
+    void s2_e4_sees_a_2_s_bucket_with_fewer_pods_that_lies_after_the_first_150_s_of_the_run_after_the_baseline() {
+        RunMetrics all = s2.evaluate(s2Run(s2WithoutExposure()));
+        RunMetrics fewer = s2.evaluate(s2Run(reroute(s2WithoutExposure(), 15_000, 15_100, C, B)));
+
+        assertEquals(VALID, fewer.verdict(), fewer.invalidReasons().toString());
+        assertEquals(3, value(all, "E4"));
+        assertEquals(2, value(fewer, "E4"));
     }
 
     @Test
@@ -644,9 +787,9 @@ class EvaluatorTest {
         RunRecord record = s3Run(s3Observations(true, true));
         List<String> columns = Evaluator.columns(s3Scenario);
 
-        assertEquals(List.of("run_id", "approach", "block", "position", "attempt", "verdict", "reasons", "flags",
-                "U1", "U2", "U2_text", "U3", "U4", "U5"), Evaluator.header(columns));
-        assertEquals(List.of("run-s3", "way-c", "1", "1", "1", "VALID", "", "",
+        assertEquals(List.of("protocolVersion", "run_id", "approach", "block", "position", "attempt", "verdict",
+                "reasons", "flags", "U1", "U2", "U2_text", "U3", "U4", "U5"), Evaluator.header(columns));
+        assertEquals(List.of("1", "run-s3", "way-c", "1", "1", "1", "VALID", "", "",
                 "1", "6002", "v2", "59980", "3982", "0"), Evaluator.row(record, s3.evaluate(record), columns));
     }
 
@@ -655,10 +798,10 @@ class EvaluatorTest {
         RunRecord lostUpdate = s3Run(s3Observations(false, false));
         RunRecord notRecovered = s2Run(s2Observations(false));
 
-        assertEquals(List.of("run-s3", "way-c", "1", "1", "1", "VALID", "", "LOST_UPDATE",
+        assertEquals(List.of("1", "run-s3", "way-c", "1", "1", "1", "VALID", "", "LOST_UPDATE",
                         "0", ">210000", "", "0", ">148000", "0"),
                 Evaluator.row(lostUpdate, s3.evaluate(lostUpdate), Evaluator.columns(s3Scenario)));
-        assertEquals(List.of("run-s2", "way-b", "1", "1", "1", "VALID", "",
+        assertEquals(List.of("1", "run-s2", "way-b", "1", "1", "1", "VALID", "",
                         "FAILED_REQUESTS LOW_RESOLUTION NOT_RECOVERED",
                         "1", "33", "0.0008333333333333334", "100", "2", ">149920"),
                 Evaluator.row(notRecovered, s2.evaluate(notRecovered), Evaluator.columns(s2Scenario)));
@@ -698,6 +841,10 @@ class EvaluatorTest {
         });
         observations = reroute(observations, 5_100, 10_750, A, B);
         return replace(observations, failure(5_200), failure(5_201), failure(5_202), failure(5_203), failure(5_204));
+    }
+
+    private static List<Observation> s2WithoutExposure() {
+        return load(0, 18_000, TestRuns.allSwitchAt(215_000, "v1", "v3"));
     }
 
     private static RunRecord s2Run(List<Observation> observations) {

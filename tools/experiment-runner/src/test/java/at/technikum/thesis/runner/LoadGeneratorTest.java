@@ -10,6 +10,8 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -59,6 +61,51 @@ class LoadGeneratorTest {
             assertEquals(load.startedAt() + i * 20.0, o.intendedAt(), 1e-9);
             assertTrue(o.ok(), String.valueOf(o.error()));
             assertEquals(o.receivedAt() - o.intendedAt(), o.latencyMillis());
+        }
+    }
+
+    @Test
+    void theLoadIsOpenLoopSoSlowAnswersDoNotSlowTheScheduleOf50RequestsPerSecond() throws Exception {
+        ExecutorService handlers = Executors.newCachedThreadPool();
+        HttpServer slow = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        slow.setExecutor(handlers);
+        slow.createContext("/probe", exchange -> {
+            try {
+                Thread.sleep(300);
+                byte[] body = "{\"pod\":\"pod-a\",\"configVersion\":\"v1\",\"startedAt\":1}"
+                        .getBytes(StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(200, body.length);
+                exchange.getResponseBody().write(body);
+            } catch (InterruptedException ignored) {
+            } finally {
+                exchange.close();
+            }
+        });
+        slow.start();
+        try {
+            RunnerClock clock = new RunnerClock();
+            LoadGenerator load = new LoadGenerator(new ProbeClient(
+                    URI.create("http://127.0.0.1:" + slow.getAddress().getPort() + "/probe"), clock), clock, 50);
+
+            load.start();
+            Thread.sleep(1_000);
+            List<Observation> observations = load.stop();
+
+            assertTrue(load.scheduledCount() >= 45 && load.scheduledCount() <= 55,
+                    load.scheduledCount() + " requests started");
+            assertEquals(load.scheduledCount(), observations.size());
+            for (int i = 0; i < observations.size(); i++) {
+                Observation o = observations.get(i);
+                assertEquals(i, o.seq());
+                assertTrue(o.ok(), String.valueOf(o.error()));
+                assertTrue(o.latencyMillis() >= 290, "latency " + o.latencyMillis());
+                if (i > 0) {
+                    assertEquals(20.0, o.intendedAt() - observations.get(i - 1).intendedAt(), 1e-9);
+                }
+            }
+        } finally {
+            slow.stop(0);
+            handlers.shutdownNow();
         }
     }
 

@@ -470,6 +470,120 @@ class CampaignTest {
         assertTrue(world.kubectl.replicas.values().stream().allMatch(replicas -> replicas == 1));
     }
 
+    @Test
+    void with_every_infrastructure_deployment_up_the_deployments_of_all_approaches_are_read_before_the_load()
+            throws Exception {
+        Fakes.World world = world("s1-valid-change", 1, 1, 4);
+
+        assertEquals(0, world.campaign().run());
+
+        assertEquals(3, world.store.records.size());
+        List<String> run = world.logFrom(DELETE);
+        int invariants = run.indexOf("$ kubectl -n thesis get pods -l app=probe-service -o json");
+        assertEquals(List.of(
+                "$ kubectl -n platform get deployment reloader-reloader -o json",
+                "$ kubectl -n platform get deployment config-watcher -o json",
+                "$ kubectl -n platform get deployment config-server -o json",
+                "$ kubectl -n platform get deployment rabbitmq -o json",
+                "probe 60"), run.subList(invariants + 1, invariants + 6));
+        assertTrue(invariants < run.indexOf("load start"));
+    }
+
+    @Test
+    void an_infrastructure_deployment_of_another_approach_at_0_replicas_stops_the_campaign_before_the_load()
+            throws Exception {
+        Fakes.World world = world("s1-valid-change", 1, 1, 4);
+        String first = BlockPlan.draw(List.of("way-a", "way-b", "way-c"), 1, 4).get(0).get(0);
+        String down = first.equals("way-b") ? "reloader-reloader" : "config-watcher";
+        world.kubectl.replicas.put("platform/" + down, 0);
+
+        assertEquals(1, world.campaign().run());
+
+        assertEquals(0, world.store.records.size());
+        assertEquals(1, world.log.stream().filter(DELETE::equals).count());
+        assertTrue(world.log.contains("$ kubectl -n platform get deployment " + down + " -o json"));
+        assertFalse(world.log.contains("probe 60"));
+        assertFalse(world.log.contains("load start"));
+        assertFalse(world.log.stream().anyMatch(entry -> entry.contains(" scale ")));
+    }
+
+    @Test
+    void an_infrastructure_deployment_with_a_replica_that_is_not_ready_stops_the_campaign_before_the_load()
+            throws Exception {
+        Fakes.World world = world("s3-infra-outage", 1, 1, 4);
+        world.kubectl.replicas.put("platform/rabbitmq", 3);
+        world.kubectl.readyReplicas.put("platform/rabbitmq", 2);
+
+        assertEquals(1, world.campaign().run());
+
+        assertEquals(0, world.store.records.size());
+        assertEquals(1, world.log.stream().filter(DELETE::equals).count());
+        assertFalse(world.log.contains("probe 60"));
+        assertFalse(world.log.contains("load start"));
+        assertFalse(world.log.stream().anyMatch(entry -> entry.contains(" scale ")));
+    }
+
+    @Test
+    void an_infrastructure_deployment_that_cannot_be_read_stops_the_campaign_before_the_load() throws Exception {
+        Fakes.World world = world("s1-valid-change", 1, 1, 4);
+        world.kubectl.fails = command -> command.equals("kubectl -n platform get deployment config-server -o json")
+                && world.log.contains("$ kubectl -n thesis get pods -l app=probe-service -o json");
+
+        assertEquals(1, world.campaign().run());
+
+        assertEquals(0, world.store.records.size());
+        assertFalse(world.log.contains("load start"));
+    }
+
+    @Test
+    void an_evaluation_that_throws_still_saves_the_raw_run_as_invalid_and_stops_the_campaign_with_1()
+            throws Exception {
+        Fakes.World world = world("s1-valid-change", 1, 1, 4);
+        world.judge.verdict = record -> {
+            throw new IllegalStateException("thrown in the test: evaluate");
+        };
+
+        assertEquals(1, world.campaign().run());
+
+        assertEquals(1, world.store.records.size());
+        RunRecord record = world.store.records.get(0);
+        assertEquals(world.judge.records.get(0), record);
+        assertEquals(world.probe.loadObservations, record.observations());
+        RunMetrics metrics = world.store.metrics.get(0);
+        assertEquals(record.runId(), metrics.runId());
+        assertEquals(record.approach(), metrics.approach());
+        assertEquals(INVALID, metrics.verdict());
+        assertEquals(List.of("the evaluation failed: java.lang.IllegalStateException: thrown in the test: evaluate"),
+                metrics.invalidReasons());
+        assertEquals(Set.of(), metrics.flags());
+        assertEquals(List.of(), metrics.metrics());
+        assertEquals(1, world.log.stream().filter(DELETE::equals).count());
+        assertEquals("store " + record.approach(), world.log.get(world.log.size() - 1));
+    }
+
+    @Test
+    void a_restore_that_fails_after_a_complete_run_still_judges_and_saves_that_run_and_stops_with_1()
+            throws Exception {
+        Fakes.World world = world("s3-infra-outage", 1, 1, 4);
+        world.kubectl.fails = command -> command.startsWith("kubectl -n platform rollout status deployment/");
+
+        assertEquals(1, world.campaign().run());
+
+        assertEquals(1, world.store.records.size());
+        assertEquals(1, world.judge.records.size());
+        RunRecord record = world.store.records.get(0);
+        assertEquals(List.of(Scenario.Action.INFRA_DOWN, Scenario.Action.COMMIT, Scenario.Action.DELETE_POD,
+                Scenario.Action.INFRA_UP), record.steps().stream().map(RunRecord.StepRecord::action).toList());
+        assertEquals(List.of(0, 0, 0, 0), record.steps().stream().map(RunRecord.StepRecord::exitCode).toList());
+        assertEquals(360_000, record.runEndAt());
+        assertEquals(world.probe.loadObservations, record.observations());
+        assertEquals(VALID, world.store.metrics.get(0).verdict());
+        assertEquals(1, world.log.stream().filter("load stop"::equals).count());
+        assertTrue(world.log.indexOf("load stop") < world.log.indexOf("judge " + record.approach()));
+        assertEquals(1, world.log.stream().filter(DELETE::equals).count());
+        assertEquals("store " + record.approach(), world.log.get(world.log.size() - 1));
+    }
+
     private Fakes.World world(String scenario, int validRuns, int maxBlocks, long seed) throws IOException {
         return new Fakes.World(Fakes.World.loaded(scenario, validRuns, maxBlocks, seed), results);
     }

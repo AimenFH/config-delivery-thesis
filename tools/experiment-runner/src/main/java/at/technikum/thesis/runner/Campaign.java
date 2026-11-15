@@ -153,10 +153,18 @@ public final class Campaign {
         RunnerClock clock = new RunnerClock();
         double preparationAtRunStart = pacer.now(preparation);
         Measurement measurement = new Measurement(samplers.get());
+        StepExecutor executor = new StepExecutor(protocol, cluster, adapter, pacer, clock);
         StepExecutor.Timeline timeline;
+        CampaignStopped restoreFailed = null;
         try {
             measurement.start(clock);
-            timeline = new StepExecutor(protocol, cluster, adapter, pacer, clock).run(scenario, measurement::stop);
+            timeline = executor.run(scenario, measurement::stop);
+        } catch (CampaignStopped stopped) {
+            if (executor.completed() == null) {
+                throw stopped;
+            }
+            timeline = executor.completed();
+            restoreFailed = stopped;
         } finally {
             measurement.stop();
         }
@@ -169,8 +177,18 @@ public final class Campaign {
                 onRunClock(sourceCheck, preparationAtRunStart), timeline.steps(), measurement.observations,
                 measurement.resources,
                 new RunRecord.ClusterState(podsBefore, podsAfter, infrastructure, events), errors);
-        RunMetrics metrics = judge.evaluate(record);
+        RunMetrics metrics;
+        try {
+            metrics = judge.evaluate(record);
+        } catch (RuntimeException e) {
+            store.save(record, new RunMetrics(record.runId(), record.approach(), record.scenario(), record.block(),
+                    RunMetrics.Verdict.INVALID, List.of("the evaluation failed: " + e), Set.of(), false, List.of()));
+            throw new CampaignStopped("the evaluation of run " + runId + " failed: " + e);
+        }
         store.save(record, metrics);
+        if (restoreFailed != null) {
+            throw restoreFailed;
+        }
         return metrics;
     }
 
@@ -184,6 +202,7 @@ public final class Campaign {
             pods = cluster.workloadPodsJson(clock);
             differences = new ArrayList<>(InvariantCheck.check(deployment, service, pods, protocol,
                     loaded.scenario().gate()));
+            differences.addAll(infrastructureDown(clock));
         } catch (ClusterControl.CommandFailed e) {
             throw new CampaignStopped("the invariants could not be read: " + e.getMessage());
         }
@@ -198,6 +217,26 @@ public final class Campaign {
         if (firstImageId == null) {
             firstImageId = imageId;
         }
+    }
+
+    private List<String> infrastructureDown(RunnerClock clock) {
+        Set<ApproachDescriptor.Infrastructure> entries = new LinkedHashSet<>();
+        for (ApproachDescriptor approach : loaded.approaches()) {
+            entries.addAll(approach.infrastructure());
+        }
+        List<String> differences = new ArrayList<>();
+        for (ApproachDescriptor.Infrastructure entry : entries) {
+            JsonNode deployment = cluster.deploymentJson(entry.namespace(), entry.deployment(), clock);
+            int desired = deployment.path("spec").path("replicas").asInt(0);
+            int ready = deployment.path("status").path("readyReplicas").asInt(0);
+            String name = "infrastructure " + entry.namespace() + "/" + entry.deployment();
+            if (desired < 1) {
+                differences.add(name + " has " + desired + " desired replicas, at least 1 is required");
+            } else if (ready < desired) {
+                differences.add(name + " has " + ready + " of " + desired + " desired replicas ready");
+            }
+        }
+        return differences;
     }
 
     private Set<String> namespaces() {

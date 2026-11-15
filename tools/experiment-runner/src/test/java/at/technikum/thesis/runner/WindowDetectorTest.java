@@ -30,6 +30,7 @@ class WindowDetectorTest {
         WindowDetector.Result result = detector.detect(observations, CHANGE);
 
         assertTrue(result.valid(), result.problems().toString());
+        assertEquals(List.of(), result.flags());
         assertEquals("v1", result.oldVersion());
         assertEquals("v2", result.newVersion());
         assertEquals(6000, result.firstNewAt());
@@ -65,7 +66,8 @@ class WindowDetectorTest {
         WindowDetector.Result result = detector.detect(observations, CHANGE);
 
         assertNull(result.windowMillis());
-        assertProblem(result, "new version never observed");
+        assertTrue(result.valid(), result.problems().toString());
+        assertEquals(List.of(RunMetrics.Flag.NOT_CONVERGED), result.flags());
     }
 
     @Test
@@ -77,7 +79,8 @@ class WindowDetectorTest {
 
         WindowDetector.Result result = detector.detect(observations, CHANGE);
 
-        assertProblem(result, "pod c still served v1 at the end of the run");
+        assertTrue(result.valid(), result.problems().toString());
+        assertEquals(List.of(RunMetrics.Flag.NOT_CONVERGED), result.flags());
     }
 
     @Test
@@ -89,7 +92,8 @@ class WindowDetectorTest {
 
         WindowDetector.Result result = detector.detect(observations, CHANGE);
 
-        assertProblem(result, "pod a served v1 again after v2");
+        assertTrue(result.valid(), result.problems().toString());
+        assertEquals(List.of(RunMetrics.Flag.NOT_CONVERGED, RunMetrics.Flag.REGRESSION), result.flags());
     }
 
     @Test
@@ -101,6 +105,7 @@ class WindowDetectorTest {
 
         WindowDetector.Result result = detector.detect(observations, CHANGE);
 
+        assertFalse(result.valid());
         assertProblem(result, "warm-up showed more than one version");
     }
 

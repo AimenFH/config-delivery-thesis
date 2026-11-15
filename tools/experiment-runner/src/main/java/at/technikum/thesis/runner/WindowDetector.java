@@ -2,6 +2,7 @@ package at.technikum.thesis.runner;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -23,7 +24,8 @@ public final class WindowDetector {
             Double propagationMillis,
             Double convergenceMillis,
             long failedAfterChange,
-            List<String> problems
+            List<String> problems,
+            List<RunMetrics.Flag> flags
     ) {
         public boolean valid() {
             return problems.isEmpty();
@@ -85,6 +87,7 @@ public final class WindowDetector {
         double changeStart = change.startedAt();
         double changeEnd = change.finishedAt();
         List<String> problems = new ArrayList<>();
+        Set<RunMetrics.Flag> flags = EnumSet.noneOf(RunMetrics.Flag.class);
 
         List<Observation> ok = answers(observations);
 
@@ -121,10 +124,10 @@ public final class WindowDetector {
 
         if (oldVersion == null || newVersion == null) {
             if (newVersion == null) {
-                problems.add("new version never observed; the run may be too short");
+                flags.add(RunMetrics.Flag.NOT_CONVERGED);
             }
             return new Result(oldVersion, newVersion, changeStart, changeEnd,
-                    null, null, null, null, null, null, failed, problems);
+                    null, null, null, null, null, null, failed, problems, List.copyOf(flags));
         }
 
         Map<String, List<Observation>> byPod = ok.stream()
@@ -148,7 +151,7 @@ public final class WindowDetector {
             Observation last = pod.get(pod.size() - 1);
             boolean stillServing = runEnd - last.receivedAt() <= maxGapMillis;
             if (stillServing && last.configVersion().equals(oldVersion)) {
-                problems.add("pod " + entry.getKey() + " still served " + oldVersion + " at the end of the run");
+                flags.add(RunMetrics.Flag.NOT_CONVERGED);
             }
             double firstNewOnPod = pod.stream()
                     .filter(o -> o.configVersion().equals(newVersion))
@@ -158,8 +161,7 @@ public final class WindowDetector {
                     .filter(o -> o.configVersion().equals(oldVersion) && o.sentAt() > firstNewOnPod)
                     .count();
             if (regressions > 0) {
-                problems.add("pod " + entry.getKey() + " served " + oldVersion + " again after "
-                        + newVersion + " (" + regressions + " responses)");
+                flags.add(RunMetrics.Flag.REGRESSION);
             }
         }
 
@@ -169,7 +171,7 @@ public final class WindowDetector {
                 Math.max(0, rawWindow + startUncertainty + endUncertainty),
                 firstNew.receivedAt() - changeEnd,
                 convergedAt - changeEnd,
-                failed, problems);
+                failed, problems, List.copyOf(flags));
     }
 
     private static List<Observation> answers(List<Observation> observations) {

@@ -75,12 +75,13 @@ public final class Evaluator implements RunJudge {
         }
         Csv.write(campaignDir.resolve(RUNS_FILE), rows);
         Summary.of(all, campaign.approaches(), campaign.protocol().bootstrapResamples(),
-                campaign.protocol().bootstrapSeed()).writeCsv(campaignDir.resolve(SUMMARY_FILE));
+                campaign.protocol().bootstrapSeed())
+                .writeCsv(campaignDir.resolve(SUMMARY_FILE), campaign.protocol().protocolVersion());
         return all;
     }
 
     static List<String> header(List<String> columns) {
-        List<String> header = new ArrayList<>(List.of(
+        List<String> header = new ArrayList<>(List.of("protocolVersion",
                 "run_id", "approach", "block", "position", "attempt", "verdict", "reasons", "flags"));
         for (String column : columns) {
             header.add(column);
@@ -97,6 +98,7 @@ public final class Evaluator implements RunJudge {
             byColumn.put(metric.column(), metric);
         }
         List<String> row = new ArrayList<>();
+        row.add(Integer.toString(record.protocolVersion()));
         row.add(metrics.runId());
         row.add(metrics.approach());
         row.add(Integer.toString(record.block()));
@@ -285,9 +287,24 @@ public final class Evaluator implements RunJudge {
             for (ResourceSample sample : resources) {
                 timesByNode.computeIfAbsent(String.valueOf(sample.node()), node -> new TreeSet<>()).add(sample.at());
             }
+            if (record.cluster() != null) {
+                List<RunRecord.PodInfo> pods = new ArrayList<>(orEmpty(record.cluster().podsBefore()));
+                pods.addAll(orEmpty(record.cluster().podsAfter()));
+                for (RunRecord.PodInfo pod : pods) {
+                    if (pod != null && pod.node() != null) {
+                        timesByNode.computeIfAbsent(pod.node(), node -> new TreeSet<>());
+                    }
+                }
+            }
             List<String> problems = new ArrayList<>();
             for (Map.Entry<String, TreeSet<Double>> node : timesByNode.entrySet()) {
                 TreeSet<Double> times = node.getValue();
+                if (times.isEmpty()) {
+                    problems.add(String.format(Locale.ROOT,
+                            "resource sampling: node %s runs pods of the pod list and has no sample",
+                            node.getKey()));
+                    continue;
+                }
                 if (distance(times, measured.from()) > limit) {
                     problems.add(String.format(Locale.ROOT,
                             "resource sampling: node %s has no sample within %d s of the start of the measured run",
@@ -334,7 +351,7 @@ public final class Evaluator implements RunJudge {
             if (Consistency.regressions(observations, afterBaseline, declaredVersions) > 0) {
                 flags.add(RunMetrics.Flag.REGRESSION);
             }
-            if (availability.failedIn(afterBaseline) > 0) {
+            if (availability.failedIn(reported.contains(MetricId.A1) ? observation : afterBaseline) > 0) {
                 flags.add(RunMetrics.Flag.FAILED_REQUESTS);
             }
             if (coverage.hasGap(observations, afterBaseline)) {

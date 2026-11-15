@@ -17,7 +17,7 @@ public final class Summary {
     public static final String DIFFERENCE = "difference";
     public static final String SENSITIVITY = "sensitivity";
 
-    public static final List<String> HEADER = List.of("kind", "approach", "other", "metric", "n", "n_other",
+    public static final List<String> HEADER = List.of("protocolVersion", "kind", "approach", "other", "metric", "n", "n_other",
             "censored", "min", "q1", "median", "q3", "max", "ci_low", "ci_high", "cliffs_delta");
 
     private static final Set<MetricId> SENSITIVITY_METRICS = Set.of(MetricId.A1, MetricId.F1);
@@ -114,11 +114,11 @@ public final class Summary {
         return rows.stream().filter(row -> row.kind().equals(kind)).toList();
     }
 
-    public void writeCsv(Path file) throws IOException {
+    public void writeCsv(Path file, int protocolVersion) throws IOException {
         List<List<String>> lines = new ArrayList<>();
         lines.add(HEADER);
         for (Row row : rows) {
-            lines.add(List.of(row.kind(), row.approach(), row.other() == null ? "" : row.other(), row.metric(),
+            lines.add(List.of(Integer.toString(protocolVersion), row.kind(), row.approach(), row.other() == null ? "" : row.other(), row.metric(),
                     Csv.number(row.n()), Csv.number(row.nOther()), Csv.number(row.censored()),
                     Csv.number(row.min()), Csv.number(row.q1()), Csv.number(row.median()), Csv.number(row.q3()),
                     Csv.number(row.max()), Csv.number(row.ciLow()), Csv.number(row.ciHigh()),

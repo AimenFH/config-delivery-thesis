@@ -19,6 +19,7 @@ public final class StepExecutor {
     private final RunnerClock clock;
     private final Map<ApproachDescriptor.Infrastructure, Integer> remembered = new LinkedHashMap<>();
     private final Set<ApproachDescriptor.Infrastructure> scaled = new LinkedHashSet<>();
+    private Timeline completed;
 
     public StepExecutor(Protocol protocol, ClusterControl cluster, DeliveryAdapter adapter, Pacer pacer,
                         RunnerClock clock) {
@@ -31,6 +32,7 @@ public final class StepExecutor {
 
     public Timeline run(Scenario scenario, Runnable stopMeasurement) throws InterruptedException {
         Throwable failure = null;
+        Timeline reached = null;
         try {
             List<RunRecord.StepRecord> records = new ArrayList<>();
             double firstStepAt = (protocol.warmupSeconds() + protocol.baselineSeconds()) * 1000.0;
@@ -46,7 +48,8 @@ public final class StepExecutor {
             }
             double runEndAt = records.get(records.size() - 1).startedAt() + protocol.observationSeconds() * 1000.0;
             pacer.sleepUntil(clock, runEndAt);
-            return new Timeline(List.copyOf(records), runEndAt);
+            reached = new Timeline(List.copyOf(records), runEndAt);
+            return reached;
         } catch (Throwable thrown) {
             failure = thrown;
             throw thrown;
@@ -55,6 +58,7 @@ public final class StepExecutor {
             try {
                 try {
                     stopMeasurement.run();
+                    completed = reached;
                 } finally {
                     restore();
                 }
@@ -69,6 +73,10 @@ public final class StepExecutor {
                 }
             }
         }
+    }
+
+    public Timeline completed() {
+        return completed;
     }
 
     public RunRecord.StepRecord execute(int index, Scenario.Step step) {

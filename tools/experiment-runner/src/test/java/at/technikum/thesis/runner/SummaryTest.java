@@ -93,11 +93,11 @@ class SummaryTest {
                 run("r3", "way-a", true, true, Set.of(NOT_CONVERGED), censoredP1())), List.of("way-a"), RESAMPLES, SEED);
         Path file = dir.resolve("summary.csv");
 
-        summary.writeCsv(file);
+        summary.writeCsv(file, 1);
 
         assertEquals(Double.POSITIVE_INFINITY, row(summary, Summary.METRIC, "way-a", "P1").median());
         assertTrue(Files.readAllLines(file).stream()
-                .anyMatch(line -> line.startsWith("metric,way-a,,P1,3,,2,1000,censored,censored,censored,censored,")),
+                .anyMatch(line -> line.startsWith("1,metric,way-a,,P1,3,,2,1000,censored,censored,censored,censored,")),
                 Files.readString(file));
     }
 
@@ -237,20 +237,21 @@ class SummaryTest {
         Path first = dir.resolve("first.csv");
         Path second = dir.resolve("second.csv");
 
-        Summary.of(twoApproaches(), APPROACHES, RESAMPLES, SEED).writeCsv(first);
-        Summary.of(twoApproaches(), APPROACHES, RESAMPLES, SEED).writeCsv(second);
+        Summary.of(twoApproaches(), APPROACHES, RESAMPLES, SEED).writeCsv(first, 1);
+        Summary.of(twoApproaches(), APPROACHES, RESAMPLES, SEED).writeCsv(second, 1);
 
         String text = new String(Files.readAllBytes(first), StandardCharsets.UTF_8);
         List<String> lines = Files.readAllLines(first);
         assertEquals(text, new String(Files.readAllBytes(second), StandardCharsets.UTF_8));
         assertFalse(text.contains("\r"));
         assertTrue(text.endsWith("\n"));
-        assertEquals("kind,approach,other,metric,n,n_other,censored,min,q1,median,q3,max,ci_low,ci_high,cliffs_delta",
-                lines.get(0));
+        assertEquals("protocolVersion,kind,approach,other,metric,n,n_other,censored,min,q1,median,q3,max,"
+                + "ci_low,ci_high,cliffs_delta", lines.get(0));
+        assertTrue(lines.subList(1, lines.size()).stream().allMatch(line -> line.startsWith("1,")));
         assertEquals(1 + 2 * 9 + 2 * 2 + 1, lines.size());
-        assertEquals("count,way-a,,runs,3,,,,,,,,,,", lines.get(1));
-        assertTrue(lines.get(19).startsWith("metric,way-a,,P1,3,,0,1000,1500,2000,2500,3000,"), lines.get(19));
-        assertTrue(lines.get(23).startsWith("difference,way-a,way-b,P1,3,3,0,,,-3000,,,"), lines.get(23));
+        assertEquals("1,count,way-a,,runs,3,,,,,,,,,,", lines.get(1));
+        assertTrue(lines.get(19).startsWith("1,metric,way-a,,P1,3,,0,1000,1500,2000,2500,3000,"), lines.get(19));
+        assertTrue(lines.get(23).startsWith("1,difference,way-a,way-b,P1,3,3,0,,,-3000,,,"), lines.get(23));
         assertTrue(lines.get(23).endsWith(",-1"), lines.get(23));
     }
 
