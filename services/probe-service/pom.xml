@@ -13,7 +13,7 @@
 
   <groupId>at.technikum.thesis</groupId>
   <artifactId>probe-service</artifactId>
-  <version>0.1.0</version>
+  <version>0.2.0</version>
   <name>probe-service</name>
   <description>Minimal service that reports its active configuration version, value and pod identity.</description>
 

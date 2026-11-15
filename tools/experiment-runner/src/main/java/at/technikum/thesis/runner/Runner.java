@@ -21,7 +21,11 @@ public final class Runner {
 
         String campaign = arg(args, "--campaign", null);
         if (campaign != null) {
-            System.exit(new Campaign(CampaignConfig.read(Path.of(campaign))).run());
+            System.exit(campaign(Path.of(campaign)));
+        }
+        String evaluate = arg(args, "--evaluate", null);
+        if (evaluate != null) {
+            System.exit(Wiring.evaluate(Path.of(evaluate)));
         }
 
         RunSettings settings = new RunSettings(
@@ -38,6 +42,34 @@ public final class Runner {
         if (!run(settings).valid()) {
             System.exit(2);
         }
+    }
+
+    static final class Wiring {
+
+        private Wiring() {
+        }
+
+        static RunJudge judge(CampaignConfig.Loaded loaded) {
+            throw new UnsupportedOperationException("wired in phase 3");
+        }
+
+        static RunStore store(CampaignConfig.Loaded loaded, Path campaignDirectory) {
+            throw new UnsupportedOperationException("wired in phase 3");
+        }
+
+        static Sampler sampler(CampaignConfig.Loaded loaded) {
+            throw new UnsupportedOperationException("wired in phase 3");
+        }
+
+        static int evaluate(Path campaignDirectory) {
+            throw new UnsupportedOperationException("wired in phase 3");
+        }
+    }
+
+    static int campaign(Path file) throws Exception {
+        CampaignConfig.Loaded loaded = CampaignConfig.read(file).load();
+        return new Campaign(loaded, () -> Wiring.sampler(loaded), Wiring.judge(loaded),
+                directory -> Wiring.store(loaded, directory)).run();
     }
 
     public static RunResult run(RunSettings settings) throws Exception {

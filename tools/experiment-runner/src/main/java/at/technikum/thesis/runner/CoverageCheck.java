@@ -2,6 +2,7 @@ package at.technikum.thesis.runner;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -14,6 +15,10 @@ public final class CoverageCheck {
         public boolean valid() {
             return problems.isEmpty();
         }
+
+        public double longestGapMillis() {
+            return pods.stream().mapToDouble(PodCoverage::maxGapMillis).max().orElse(0);
+        }
     }
 
     private final int expectedReplicas;
@@ -22,6 +27,16 @@ public final class CoverageCheck {
     public CoverageCheck(int expectedReplicas, double maxAllowedGapMillis) {
         this.expectedReplicas = expectedReplicas;
         this.maxAllowedGapMillis = maxAllowedGapMillis;
+    }
+
+    public Result check(List<Observation> observations, Interval interval) {
+        return check(observations.stream()
+                .filter(o -> o.configVersion() != null && interval.contains(o.intendedAt()))
+                .toList());
+    }
+
+    public boolean hasGap(List<Observation> observations, Interval interval) {
+        return check(observations, interval).longestGapMillis() > maxAllowedGapMillis;
     }
 
     public Result check(List<Observation> observations) {
@@ -45,13 +60,14 @@ public final class CoverageCheck {
             }
             pods.add(new PodCoverage(entry.getKey(), times.size(), (double) times.size() / total, maxGap));
             if (maxGap > maxAllowedGapMillis) {
-                problems.add(String.format("pod %s was unobserved for %.0f ms (limit %.0f ms)",
+                problems.add(String.format(Locale.ROOT, "pod %s was unobserved for %.0f ms (limit %.0f ms)",
                         entry.getKey(), maxGap, maxAllowedGapMillis));
             }
         }
 
         if (seenAt.size() < expectedReplicas) {
-            problems.add(String.format("only %d of %d replicas were observed", seenAt.size(), expectedReplicas));
+            problems.add(String.format(Locale.ROOT, "only %d of %d replicas were observed",
+                    seenAt.size(), expectedReplicas));
         }
 
         return new Result(pods, problems);

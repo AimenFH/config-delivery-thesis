@@ -30,10 +30,55 @@ public final class WindowDetector {
         }
     }
 
+    public record Window(Double firstNewAt, Double lastOldAt, Double windowMillis, Double windowMaxMillis) {
+
+        public static Window unobserved() {
+            return new Window(null, null, null, null);
+        }
+
+        public Double convergedAt() {
+            if (firstNewAt == null) {
+                return null;
+            }
+            return lastOldAt == null ? firstNewAt : Double.valueOf(Math.max(lastOldAt, firstNewAt));
+        }
+    }
+
     private final double maxGapMillis;
 
     public WindowDetector(double maxGapMillis) {
         this.maxGapMillis = maxGapMillis;
+    }
+
+    public Window window(List<Observation> observations, String oldVersion, String newVersion, double commitStartedAt) {
+        List<Observation> ok = answers(observations);
+        List<Observation> afterCommit = ok.stream().filter(o -> o.receivedAt() >= commitStartedAt).toList();
+        Observation firstNew = afterCommit.stream()
+                .filter(o -> o.configVersion().equals(newVersion))
+                .findFirst().orElse(null);
+        Observation lastOld = afterCommit.stream()
+                .filter(o -> o.configVersion().equals(oldVersion))
+                .reduce((a, b) -> b).orElse(null);
+        if (firstNew == null) {
+            return new Window(null, lastOld == null ? null : lastOld.receivedAt(), null, null);
+        }
+        Observation lastOldOfTheRun = lastOld != null ? lastOld : ok.stream()
+                .filter(o -> o.configVersion().equals(oldVersion))
+                .reduce((a, b) -> b).orElse(null);
+        double before = unobservedBefore(ok, firstNew, oldVersion, commitStartedAt);
+        double window = lastOld == null ? 0 : Math.max(0, lastOld.receivedAt() - firstNew.receivedAt());
+        double bound = lastOldOfTheRun == null ? before : Math.max(0,
+                lastOldOfTheRun.receivedAt() - firstNew.receivedAt() + before + unobservedAfter(ok, lastOldOfTheRun));
+        return new Window(firstNew.receivedAt(), lastOld == null ? null : lastOld.receivedAt(), window, bound);
+    }
+
+    public boolean stillServed(List<Observation> observations, String oldVersion, Window window, Interval interval) {
+        if (window.firstNewAt() == null) {
+            return true;
+        }
+        Interval end = new Interval(Math.max(interval.from(), interval.to() - maxGapMillis), interval.to());
+        return answers(observations).stream()
+                .anyMatch(o -> end.contains(o.intendedAt()) && o.configVersion().equals(oldVersion));
     }
 
     public Result detect(List<Observation> observations, ChangeTrigger.Result change) {
@@ -41,10 +86,7 @@ public final class WindowDetector {
         double changeEnd = change.finishedAt();
         List<String> problems = new ArrayList<>();
 
-        List<Observation> ok = observations.stream()
-                .filter(o -> o.ok() && o.pod() != null && o.configVersion() != null)
-                .sorted(Comparator.comparingDouble(Observation::receivedAt))
-                .toList();
+        List<Observation> ok = answers(observations);
 
         Set<String> warmupVersions = ok.stream()
                 .filter(o -> o.receivedAt() < changeStart)
@@ -95,14 +137,8 @@ public final class WindowDetector {
                 .filter(o -> o.configVersion().equals(oldVersion))
                 .reduce((a, b) -> b).orElseThrow();
 
-        double startUncertainty = firstNew.receivedAt() - byPod.get(firstNew.pod()).stream()
-                .filter(o -> o.receivedAt() < firstNew.receivedAt() && o.configVersion().equals(oldVersion))
-                .mapToDouble(Observation::receivedAt)
-                .max().orElse(Math.max(changeStart, firstNew.receivedAt() - maxGapMillis));
-        double endUncertainty = byPod.get(lastOld.pod()).stream()
-                .filter(o -> o.receivedAt() > lastOld.receivedAt())
-                .mapToDouble(Observation::receivedAt)
-                .min().orElse(lastOld.receivedAt() + maxGapMillis) - lastOld.receivedAt();
+        double startUncertainty = unobservedBefore(ok, firstNew, oldVersion, changeStart);
+        double endUncertainty = unobservedAfter(ok, lastOld);
 
         double rawWindow = lastOld.receivedAt() - firstNew.receivedAt();
         double convergedAt = Math.max(lastOld.receivedAt(), firstNew.receivedAt());
@@ -134,5 +170,28 @@ public final class WindowDetector {
                 firstNew.receivedAt() - changeEnd,
                 convergedAt - changeEnd,
                 failed, problems);
+    }
+
+    private static List<Observation> answers(List<Observation> observations) {
+        return observations.stream()
+                .filter(o -> o.ok() && o.pod() != null && o.configVersion() != null)
+                .sorted(Comparator.comparingDouble(Observation::receivedAt))
+                .toList();
+    }
+
+    private double unobservedBefore(List<Observation> ok, Observation firstNew, String oldVersion, double changeStart) {
+        return firstNew.receivedAt() - ok.stream()
+                .filter(o -> o.pod().equals(firstNew.pod()))
+                .filter(o -> o.receivedAt() < firstNew.receivedAt() && o.configVersion().equals(oldVersion))
+                .mapToDouble(Observation::receivedAt)
+                .max().orElse(Math.max(changeStart, firstNew.receivedAt() - maxGapMillis));
+    }
+
+    private double unobservedAfter(List<Observation> ok, Observation lastOld) {
+        return ok.stream()
+                .filter(o -> o.pod().equals(lastOld.pod()))
+                .filter(o -> o.receivedAt() > lastOld.receivedAt())
+                .mapToDouble(Observation::receivedAt)
+                .min().orElse(lastOld.receivedAt() + maxGapMillis) - lastOld.receivedAt();
     }
 }

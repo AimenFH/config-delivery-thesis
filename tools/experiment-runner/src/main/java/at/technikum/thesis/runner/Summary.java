@@ -1,117 +1,179 @@
 package at.technikum.thesis.runner;
 
 import java.io.IOException;
-import java.io.PrintStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.function.Function;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.function.Predicate;
 
 public final class Summary {
 
-    public record Entry(String way, RunResult result) {
+    public static final String COUNT = "count";
+    public static final String METRIC = "metric";
+    public static final String DIFFERENCE = "difference";
+    public static final String SENSITIVITY = "sensitivity";
+
+    public static final List<String> HEADER = List.of("kind", "approach", "other", "metric", "n", "n_other",
+            "censored", "min", "q1", "median", "q3", "max", "ci_low", "ci_high", "cliffs_delta");
+
+    private static final Set<MetricId> SENSITIVITY_METRICS = Set.of(MetricId.A1, MetricId.F1);
+
+    public record Row(
+            String kind,
+            String approach,
+            String other,
+            String metric,
+            Integer n,
+            Integer nOther,
+            Integer censored,
+            Double min,
+            Double q1,
+            Double median,
+            Double q3,
+            Double max,
+            Double ciLow,
+            Double ciHigh,
+            Double cliffsDelta
+    ) {
     }
 
-    public record Count(String way, int runs, int valid) {
+    private final List<Row> rows;
+
+    private Summary(List<Row> rows) {
+        this.rows = rows;
     }
 
-    public record Stat(String way, String metric, int n, double min, double median, double max) {
-    }
+    public static Summary of(List<RunMetrics> runs, List<String> approaches, int resamples, long seed) {
+        List<String> order = new ArrayList<>(approaches);
+        Set<String> others = new TreeSet<>();
+        for (RunMetrics run : runs) {
+            if (!order.contains(run.approach())) {
+                others.add(run.approach());
+            }
+        }
+        order.addAll(others);
 
-    private static final Map<String, Function<WindowDetector.Result, Number>> METRICS = new LinkedHashMap<>();
-
-    static {
-        METRICS.put("propagationMillis", WindowDetector.Result::propagationMillis);
-        METRICS.put("windowMillis", WindowDetector.Result::windowMillis);
-        METRICS.put("windowMaxMillis", WindowDetector.Result::windowMaxMillis);
-        METRICS.put("convergenceMillis", WindowDetector.Result::convergenceMillis);
-        METRICS.put("failedAfterChange", WindowDetector.Result::failedAfterChange);
-    }
-
-    private final List<Count> counts;
-    private final List<Stat> stats;
-
-    private Summary(List<Count> counts, List<Stat> stats) {
-        this.counts = counts;
-        this.stats = stats;
-    }
-
-    public static Summary of(List<Entry> entries) {
-        Map<String, List<RunResult>> byWay = new LinkedHashMap<>();
-        for (Entry entry : entries) {
-            byWay.computeIfAbsent(entry.way(), way -> new ArrayList<>()).add(entry.result());
+        Map<String, MetricId> columns = new LinkedHashMap<>();
+        for (RunMetrics run : runs) {
+            for (Metric metric : run.metrics()) {
+                columns.putIfAbsent(metric.column(), metric.id());
+            }
         }
 
-        List<Count> counts = new ArrayList<>();
-        List<Stat> stats = new ArrayList<>();
-        for (Map.Entry<String, List<RunResult>> way : byWay.entrySet()) {
-            List<RunResult> runs = way.getValue();
-            List<WindowDetector.Result> windows = runs.stream()
-                    .filter(RunResult::valid)
-                    .map(RunResult::window)
-                    .filter(w -> w != null && w.windowMillis() != null)
-                    .toList();
-            counts.add(new Count(way.getKey(), runs.size(), (int) runs.stream().filter(RunResult::valid).count()));
-            for (Map.Entry<String, Function<WindowDetector.Result, Number>> metric : METRICS.entrySet()) {
-                double[] values = windows.stream()
-                        .mapToDouble(w -> metric.getValue().apply(w).doubleValue())
-                        .sorted()
-                        .toArray();
-                if (values.length > 0) {
-                    stats.add(new Stat(way.getKey(), metric.getKey(), values.length,
-                            values[0], median(values), values[values.length - 1]));
+        Predicate<RunMetrics> valid = run -> run.verdict() == RunMetrics.Verdict.VALID;
+        List<Row> rows = new ArrayList<>();
+        for (String approach : order) {
+            List<RunMetrics> own = runs.stream().filter(run -> run.approach().equals(approach)).toList();
+            List<RunMetrics> ownValid = own.stream().filter(valid).toList();
+            rows.add(count(approach, "runs", own.size()));
+            rows.add(count(approach, "valid", ownValid.size()));
+            rows.add(count(approach, "invalid", own.size() - ownValid.size()));
+            for (RunMetrics.Flag flag : RunMetrics.Flag.values()) {
+                rows.add(count(approach, flag.name(),
+                        (int) ownValid.stream().filter(run -> run.flags().contains(flag)).count()));
+            }
+        }
+        for (String approach : order) {
+            for (String column : columns.keySet()) {
+                rows.add(statistics(METRIC, approach, column, values(runs, approach, column, valid),
+                        resamples, seed));
+            }
+        }
+        for (Map.Entry<String, MetricId> column : columns.entrySet()) {
+            if (!column.getValue().primary()) {
+                continue;
+            }
+            for (int first = 0; first < order.size(); first++) {
+                for (int second = first + 1; second < order.size(); second++) {
+                    rows.add(difference(order.get(first), order.get(second), column.getKey(),
+                            values(runs, order.get(first), column.getKey(), valid),
+                            values(runs, order.get(second), column.getKey(), valid), resamples, seed));
                 }
             }
         }
-        return new Summary(counts, stats);
-    }
-
-    public List<Count> counts() {
-        return counts;
-    }
-
-    public List<Stat> stats() {
-        return stats;
-    }
-
-    public boolean allValid() {
-        return counts.stream().allMatch(c -> c.valid() == c.runs());
-    }
-
-    public boolean reached(int validRunsPerWay) {
-        return !counts.isEmpty() && counts.stream().allMatch(c -> c.valid() >= validRunsPerWay);
-    }
-
-    public void print(PrintStream out) {
-        out.println("Campaign summary (valid runs only)");
-        for (Count count : counts) {
-            out.printf("  %s: %d runs, %d valid%n", count.way(), count.runs(), count.valid());
-            out.printf("    %-20s %3s %12s %12s %12s%n", "metric", "n", "min", "median", "max");
-            for (Stat stat : stats) {
-                if (stat.way().equals(count.way())) {
-                    out.printf(Locale.ROOT, "    %-20s %3d %12.1f %12.1f %12.1f%n",
-                            stat.metric(), stat.n(), stat.min(), stat.median(), stat.max());
+        for (String approach : order) {
+            for (Map.Entry<String, MetricId> column : columns.entrySet()) {
+                if (SENSITIVITY_METRICS.contains(column.getValue())) {
+                    rows.add(statistics(SENSITIVITY, approach, column.getKey(),
+                            values(runs, approach, column.getKey(), RunMetrics::commitSucceeded), resamples, seed));
                 }
             }
         }
+        return new Summary(List.copyOf(rows));
+    }
+
+    public List<Row> rows() {
+        return rows;
+    }
+
+    public List<Row> rows(String kind) {
+        return rows.stream().filter(row -> row.kind().equals(kind)).toList();
     }
 
     public void writeCsv(Path file) throws IOException {
-        List<String> lines = new ArrayList<>();
-        lines.add("way,metric,n,min,median,max");
-        for (Stat stat : stats) {
-            lines.add(String.format(Locale.ROOT, "%s,%s,%d,%.1f,%.1f,%.1f",
-                    stat.way(), stat.metric(), stat.n(), stat.min(), stat.median(), stat.max()));
+        List<List<String>> lines = new ArrayList<>();
+        lines.add(HEADER);
+        for (Row row : rows) {
+            lines.add(List.of(row.kind(), row.approach(), row.other() == null ? "" : row.other(), row.metric(),
+                    Csv.number(row.n()), Csv.number(row.nOther()), Csv.number(row.censored()),
+                    Csv.number(row.min()), Csv.number(row.q1()), Csv.number(row.median()), Csv.number(row.q3()),
+                    Csv.number(row.max()), Csv.number(row.ciLow()), Csv.number(row.ciHigh()),
+                    Csv.number(row.cliffsDelta())));
         }
-        Files.write(file, lines);
+        Csv.write(file, lines);
     }
 
-    static double median(double[] sorted) {
-        int middle = sorted.length / 2;
-        return sorted.length % 2 == 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+    static double[] values(List<RunMetrics> runs, String approach, String column, Predicate<RunMetrics> included) {
+        return Statistics.sorted(runs.stream()
+                .filter(run -> run.approach().equals(approach))
+                .filter(included)
+                .flatMap(run -> run.metrics().stream())
+                .filter(metric -> metric.column().equals(column) && metric.value() != null)
+                .mapToDouble(metric -> metric.censored() ? Double.POSITIVE_INFINITY : metric.value())
+                .toArray());
+    }
+
+    private static Row count(String approach, String name, int count) {
+        return new Row(COUNT, approach, null, name, count, null, null, null, null, null, null, null,
+                null, null, null);
+    }
+
+    private static Row statistics(String kind, String approach, String column, double[] sorted,
+                                  int resamples, long seed) {
+        if (sorted.length == 0) {
+            return new Row(kind, approach, null, column, 0, null, 0, null, null, null, null, null, null, null, null);
+        }
+        double[] interval = Statistics.medianInterval(sorted, resamples, Statistics.seed(seed, approach, column));
+        return new Row(kind, approach, null, column, sorted.length, null, censored(sorted),
+                sorted[0], Statistics.quantile(sorted, 0.25), Statistics.median(sorted),
+                Statistics.quantile(sorted, 0.75), sorted[sorted.length - 1], interval[0], interval[1], null);
+    }
+
+    private static Row difference(String approach, String other, String column, double[] first, double[] second,
+                                  int resamples, long seed) {
+        int censored = censored(first) + censored(second);
+        if (first.length == 0 || second.length == 0) {
+            return new Row(DIFFERENCE, approach, other, column, first.length, second.length, censored,
+                    null, null, null, null, null, null, null, null);
+        }
+        double[] interval = Statistics.medianDifferenceInterval(first, second, resamples,
+                Statistics.seed(seed, approach, other, column));
+        return new Row(DIFFERENCE, approach, other, column, first.length, second.length, censored,
+                null, null, Statistics.median(first) - Statistics.median(second), null, null,
+                interval[0], interval[1], Statistics.cliffsDelta(first, second));
+    }
+
+    private static int censored(double[] values) {
+        int censored = 0;
+        for (double value : values) {
+            if (Double.isInfinite(value)) {
+                censored++;
+            }
+        }
+        return censored;
     }
 }

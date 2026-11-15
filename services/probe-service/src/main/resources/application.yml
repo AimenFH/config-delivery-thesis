@@ -25,6 +25,11 @@ management:
   endpoint:
     health:
       show-details: always
+      validate-group-membership: false
+      group:
+        readiness:
+          include: readinessState,configGate
+          show-details: never
   health:
     rabbit:
       enabled: ${BUS_ENABLED:false}
