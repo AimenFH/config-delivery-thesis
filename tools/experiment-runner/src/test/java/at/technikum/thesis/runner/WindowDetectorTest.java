@@ -127,9 +127,9 @@ class WindowDetectorTest {
         for (String name : List.of("a", "b", "c")) {
             observations.addAll(pod(name, 0, RUN_END, switchAt(6000)));
         }
-        observations.add(new Observation(-1, 2000, 2000, 2000, 0, null, null, 0, "ConnectException"));
-        observations.add(new Observation(-2, 5500, 5500, 5500, 0, null, null, 0, "ConnectException"));
-        observations.add(new Observation(-3, 9500, 9500, 9500, 503, null, null, 0, null));
+        observations.add(new Observation(-1, 2000, 2000, 2000, 2000, 0, null, null, 0, "ConnectException"));
+        observations.add(new Observation(-2, 5500, 5500, 5500, 5500, 0, null, null, 0, "ConnectException"));
+        observations.add(new Observation(-3, 9500, 9500, 9500, 9500, 503, null, null, 0, null));
 
         WindowDetector.Result result = detector.detect(observations, CHANGE);
 
@@ -144,7 +144,7 @@ class WindowDetectorTest {
     private static List<Observation> pod(String name, double from, double to, DoubleFunction<String> versionAt) {
         List<Observation> observations = new ArrayList<>();
         for (double t = from; t < to; t += STEP) {
-            observations.add(new Observation(0, t, t, t, 200, name, versionAt.apply(t), 0, null));
+            observations.add(new Observation(0, t, t, t, t, 200, name, versionAt.apply(t), 0, null));
         }
         return observations;
     }

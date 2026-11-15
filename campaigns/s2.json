@@ -1,0 +1,8 @@
+{
+  "name": "s2",
+  "protocol": "protocol/protocol-v1.json",
+  "scenario": "scenarios/s2-invalid-config.json",
+  "validRuns": 10,
+  "maxBlocks": 25,
+  "seed": 20261115
+}

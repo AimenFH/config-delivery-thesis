@@ -1,0 +1,10 @@
+{
+  "name": "s2-invalid-config",
+  "title": "S2 invalid configuration",
+  "gate": true,
+  "invalidVersions": ["v2"],
+  "steps": [
+    {"atSeconds": 0, "action": "commit", "payload": {"configVersion": "v2", "timeoutMs": "abc"}},
+    {"atSeconds": 120, "action": "commit", "payload": {"configVersion": "v3", "timeoutMs": "1000"}}
+  ]
+}

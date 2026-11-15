@@ -1,0 +1,8 @@
+{
+  "name": "s3",
+  "protocol": "protocol/protocol-v1.json",
+  "scenario": "scenarios/s3-infra-outage.json",
+  "validRuns": 10,
+  "maxBlocks": 25,
+  "seed": 20261115
+}

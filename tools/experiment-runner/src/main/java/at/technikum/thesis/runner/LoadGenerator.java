@@ -15,6 +15,10 @@ public final class LoadGenerator {
     private final RunnerClock clock;
     private final int ratePerSecond;
     private final AtomicLong scheduled = new AtomicLong();
+    private final ConcurrentLinkedQueue<Observation> observations = new ConcurrentLinkedQueue<>();
+    private final ConcurrentLinkedQueue<CompletableFuture<Void>> inFlight = new ConcurrentLinkedQueue<>();
+    private ScheduledExecutorService ticker;
+    private double startedAt = Double.NaN;
 
     public LoadGenerator(ProbeClient client, RunnerClock clock, int ratePerSecond) {
         this.client = client;
@@ -22,18 +26,26 @@ public final class LoadGenerator {
         this.ratePerSecond = ratePerSecond;
     }
 
-    public List<Observation> run(Duration duration) throws InterruptedException {
-        ConcurrentLinkedQueue<Observation> observations = new ConcurrentLinkedQueue<>();
-        ConcurrentLinkedQueue<CompletableFuture<Void>> inFlight = new ConcurrentLinkedQueue<>();
+    public synchronized void start() {
+        if (ticker != null) {
+            throw new IllegalStateException("load generator was already started");
+        }
         long periodNanos = 1_000_000_000L / ratePerSecond;
-
-        ScheduledExecutorService ticker = Executors.newSingleThreadScheduledExecutor();
+        double periodMillis = periodNanos / 1_000_000.0;
+        ticker = Executors.newSingleThreadScheduledExecutor();
+        double start = clock.millisSinceStart();
+        startedAt = start;
         ticker.scheduleAtFixedRate(() -> {
             double scheduledAt = clock.millisSinceStart();
-            inFlight.add(client.probe(scheduled.getAndIncrement(), scheduledAt).thenAccept(observations::add));
+            long seq = scheduled.getAndIncrement();
+            inFlight.add(client.probe(seq, start + seq * periodMillis, scheduledAt).thenAccept(observations::add));
         }, 0, periodNanos, TimeUnit.NANOSECONDS);
+    }
 
-        Thread.sleep(duration.toMillis());
+    public synchronized List<Observation> stop() throws InterruptedException {
+        if (ticker == null) {
+            throw new IllegalStateException("load generator was not started");
+        }
         ticker.shutdownNow();
         ticker.awaitTermination(1, TimeUnit.SECONDS);
 
@@ -45,6 +57,16 @@ public final class LoadGenerator {
         return observations.stream()
                 .sorted((a, b) -> Long.compare(a.seq(), b.seq()))
                 .toList();
+    }
+
+    public List<Observation> run(Duration duration) throws InterruptedException {
+        start();
+        Thread.sleep(duration.toMillis());
+        return stop();
+    }
+
+    public synchronized double startedAt() {
+        return startedAt;
     }
 
     public long scheduledCount() {

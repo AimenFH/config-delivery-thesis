@@ -33,24 +33,24 @@ public final class ProbeClient {
                 .build();
     }
 
-    public CompletableFuture<Observation> probe(long seq, double scheduledAt) {
+    public CompletableFuture<Observation> probe(long seq, double intendedAt, double scheduledAt) {
         double sentAt = clock.millisSinceStart();
         return http.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .handle((response, failure) -> {
                     double receivedAt = clock.millisSinceStart();
                     if (failure != null) {
-                        return new Observation(seq, scheduledAt, sentAt, receivedAt, 0,
+                        return new Observation(seq, intendedAt, scheduledAt, sentAt, receivedAt, 0,
                                 null, null, 0, describe(failure));
                     }
                     try {
                         JsonNode body = json.readTree(response.body());
-                        return new Observation(seq, scheduledAt, sentAt, receivedAt, response.statusCode(),
+                        return new Observation(seq, intendedAt, scheduledAt, sentAt, receivedAt, response.statusCode(),
                                 body.path("pod").asText(null),
                                 body.path("configVersion").asText(null),
                                 body.path("startedAt").asLong(),
                                 null);
                     } catch (Exception e) {
-                        return new Observation(seq, scheduledAt, sentAt, receivedAt, response.statusCode(),
+                        return new Observation(seq, intendedAt, scheduledAt, sentAt, receivedAt, response.statusCode(),
                                 null, null, 0, "BadBody");
                     }
                 });

@@ -2,6 +2,7 @@ package at.technikum.thesis.runner;
 
 public record Observation(
         long seq,
+        double intendedAt,
         double scheduledAt,
         double sentAt,
         double receivedAt,
@@ -12,7 +13,7 @@ public record Observation(
         String error
 ) {
     public double latencyMillis() {
-        return receivedAt - scheduledAt;
+        return receivedAt - intendedAt;
     }
 
     public boolean ok() {

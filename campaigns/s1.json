@@ -1,0 +1,8 @@
+{
+  "name": "s1",
+  "protocol": "protocol/protocol-v1.json",
+  "scenario": "scenarios/s1-valid-change.json",
+  "validRuns": 20,
+  "maxBlocks": 25,
+  "seed": 20261115
+}

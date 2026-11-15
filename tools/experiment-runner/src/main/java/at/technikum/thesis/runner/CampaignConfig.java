@@ -1,45 +1,34 @@
 package at.technikum.thesis.runner;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
-import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
 public record CampaignConfig(
         String name,
-        int repetitions,
-        int maxAttempts,
-        String url,
-        int ratePerSecond,
-        int expectedReplicas,
-        double maxGapMillis,
-        List<Way> ways
+        String protocol,
+        String scenario,
+        int validRuns,
+        int maxBlocks,
+        long seed
 ) {
 
-    public record Way(
-            String name,
-            String manifests,
-            String versionKey,
-            List<String> changeCommand,
-            int warmupSeconds,
-            int durationSeconds,
-            int settleSeconds,
-            int pauseSeconds
+    public record Loaded(
+            CampaignConfig config,
+            Protocol protocol,
+            Scenario scenario,
+            List<ApproachDescriptor> approaches
     ) {
-
-        public List<String> changeFor(String version) {
-            if (changeCommand == null) {
-                return ClusterControl.patchCommand(versionKey, version);
-            }
-            return changeCommand.stream().map(part -> part.replace("{version}", version)).toList();
-        }
     }
 
     public static CampaignConfig read(Path file) throws IOException {
-        CampaignConfig config = new ObjectMapper().readValue(file.toFile(), CampaignConfig.class);
+        CampaignConfig config = new ObjectMapper()
+                .enable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .readValue(file.toFile(), CampaignConfig.class);
         List<String> problems = config.problems();
         if (!problems.isEmpty()) {
             throw new IllegalArgumentException(file + ": " + String.join("; ", problems));
@@ -47,8 +36,27 @@ public record CampaignConfig(
         return config;
     }
 
-    public URI uri() {
-        return URI.create(url);
+    public Loaded load() throws IOException {
+        return load(Path.of(""));
+    }
+
+    public Loaded load(Path root) throws IOException {
+        Protocol loadedProtocol = Protocol.read(root.resolve(protocol));
+        List<String> problems = problems(loadedProtocol);
+        if (!problems.isEmpty()) {
+            throw new IllegalArgumentException("campaign " + name + ": " + String.join("; ", problems));
+        }
+        Path scenarioFile = root.resolve(scenario);
+        Scenario loadedScenario = Scenario.read(scenarioFile);
+        List<String> scenarioProblems = loadedScenario.problems(loadedProtocol);
+        if (!scenarioProblems.isEmpty()) {
+            throw new IllegalArgumentException(scenarioFile + ": " + String.join("; ", scenarioProblems));
+        }
+        List<ApproachDescriptor> approaches = new ArrayList<>();
+        for (String approach : loadedProtocol.approaches()) {
+            approaches.add(ApproachDescriptor.read(root.resolve(approach)));
+        }
+        return new Loaded(this, loadedProtocol, loadedScenario, List.copyOf(approaches));
     }
 
     public List<String> problems() {
@@ -56,41 +64,25 @@ public record CampaignConfig(
         if (name == null || name.isBlank()) {
             problems.add("name is missing");
         }
-        if (repetitions < 1) {
-            problems.add("repetitions must be at least 1");
+        if (protocol == null || protocol.isBlank()) {
+            problems.add("protocol is missing");
         }
-        if (maxAttempts < repetitions) {
-            problems.add("maxAttempts must be at least repetitions");
+        if (scenario == null || scenario.isBlank()) {
+            problems.add("scenario is missing");
         }
-        if (url == null) {
-            problems.add("url is missing");
+        if (validRuns < 1) {
+            problems.add("validRuns must be at least 1");
         }
-        if (ratePerSecond < 1) {
-            problems.add("ratePerSecond must be at least 1");
+        if (validRuns > maxBlocks) {
+            problems.add("validRuns must be at most maxBlocks");
         }
-        if (expectedReplicas < 1) {
-            problems.add("expectedReplicas must be at least 1");
-        }
-        if (maxGapMillis <= 0) {
-            problems.add("maxGapMillis must be positive");
-        }
-        if (ways == null || ways.isEmpty()) {
-            problems.add("ways is empty");
-            return problems;
-        }
-        for (Way way : ways) {
-            if (way.name() == null || way.manifests() == null) {
-                problems.add("every way needs name and manifests");
-            }
-            if ((way.versionKey() == null) == (way.changeCommand() == null)) {
-                problems.add("way " + way.name() + ": needs either versionKey or changeCommand");
-            }
-            if (way.changeCommand() != null && way.changeCommand().stream().noneMatch(p -> p.contains("{version}"))) {
-                problems.add("way " + way.name() + ": changeCommand must contain {version}");
-            }
-            if (way.durationSeconds() < 1) {
-                problems.add("way " + way.name() + ": durationSeconds must be at least 1");
-            }
+        return problems;
+    }
+
+    public List<String> problems(Protocol loadedProtocol) {
+        List<String> problems = problems();
+        if (maxBlocks > loadedProtocol.maxBlocks()) {
+            problems.add("maxBlocks must be at most " + loadedProtocol.maxBlocks() + ", the limit of the protocol");
         }
         return problems;
     }

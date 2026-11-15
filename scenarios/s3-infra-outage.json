@@ -1,0 +1,12 @@
+{
+  "name": "s3-infra-outage",
+  "title": "S3 infrastructure outage",
+  "gate": false,
+  "invalidVersions": [],
+  "steps": [
+    {"atSeconds": 0, "action": "infraDown"},
+    {"atSeconds": 30, "action": "commit", "payload": {"configVersion": "v2", "timeoutMs": "1000"}},
+    {"atSeconds": 60, "action": "deletePod"},
+    {"atSeconds": 120, "action": "infraUp"}
+  ]
+}

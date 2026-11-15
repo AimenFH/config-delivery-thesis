@@ -30,7 +30,8 @@ public final class ClusterControl {
         int failed = 0;
         double maxLatency = 0;
         for (int i = 0; i < requests; i++) {
-            Observation o = client.probe(i, clock.millisSinceStart()).join();
+            double now = clock.millisSinceStart();
+            Observation o = client.probe(i, now, now).join();
             maxLatency = Math.max(maxLatency, o.latencyMillis());
             if (o.ok()) {
                 pods.add(o.pod());

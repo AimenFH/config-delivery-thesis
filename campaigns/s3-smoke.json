@@ -1,0 +1,8 @@
+{
+  "name": "s3-smoke",
+  "protocol": "protocol/protocol-v1.json",
+  "scenario": "scenarios/s3-infra-outage.json",
+  "validRuns": 1,
+  "maxBlocks": 1,
+  "seed": 20261115
+}

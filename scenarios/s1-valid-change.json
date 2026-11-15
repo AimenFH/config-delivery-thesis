@@ -1,0 +1,9 @@
+{
+  "name": "s1-valid-change",
+  "title": "S1 valid change",
+  "gate": false,
+  "invalidVersions": [],
+  "steps": [
+    {"atSeconds": 0, "action": "commit", "payload": {"configVersion": "v2", "timeoutMs": "1000"}}
+  ]
+}

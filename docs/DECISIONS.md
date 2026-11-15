@@ -464,6 +464,213 @@ result and has to be reported.
 
 ---
 
+## 2026-11-15: Fresh deployment at v1 before every run
+
+**Problem.** Scenario 1 chained versions on a long-lived deployment. Way A pods
+were replaced in every run, while Way B and Way C pods aged over the campaign, so
+the approaches started each run from different states.
+
+**Rejected.** Keeping the deployment and chaining versions (`v<epoch+n>`), which
+is faster but lets pod age differ between approaches. Resetting only the
+configuration source and keeping the pods, which still leaves old JVMs in Way B
+and Way C.
+
+**Chosen.** Before every run the Deployment is deleted, the source is reset to
+v1 and the manifests are applied again. The change is always v1 to v2. The source
+is reset before the workload is deployed, so no trigger fires on a fresh
+Deployment.
+
+**Cost.** About 2.7 minutes per run for reset, rollout and the 100 s settle time.
+
+---
+
+## 2026-11-15: Way C keeps reading from the Git repository on GitHub
+
+**Problem.** Way C's Config Server reads from a remote repository on GitHub.
+Every Way C number therefore contains internet latency that Way A and Way B do
+not have.
+
+**Rejected.** A Git server inside the cluster or a local file backend. Both
+remove the latency, but a Config Server is normally run against a remote Git
+host, so the result would describe a setup nobody uses.
+
+**Chosen.** The remote stays, permanently. The network latency is part of Way
+C's result and is recorded as a limitation. An approach descriptor may name an
+optional `sourceCheck` command. The runner times it before every run and stores
+the duration in the meta file. Way C uses `git ls-remote`. The core does not
+know which approach uses the field. P3 is reported next to P1.
+
+**Cost.** Way C's propagation and commit times vary with the connection and
+with GitHub. Runs with a slow remote are visible in the data and are not
+excluded.
+
+---
+
+## 2026-11-15: T0 is the end of commit, the trigger counts as delivery time
+
+**Problem.** Scenario 1 counted propagation from the end of the whole change
+command. In run r01 that command took 164 ms for Way A, 116 ms for Way B and
+4 082 ms for Way C, because the Way C script also pushed to GitHub and called
+`busrefresh`. Way C's trigger time was excluded, while the reaction times of
+Reloader and the Watcher were included.
+
+**Rejected.** `T0` at the start of the commit, which adds the commit duration
+to every propagation time. `T0` at the end of the trigger, which keeps the
+unfair treatment of scenario 1.
+
+**Chosen.** The change is split into `commit` and `trigger`. `t_cs` is the
+start of `commit`, `T0` is its end with exit code 0. Everything after `T0`,
+whether a controller or a trigger call, is delivery time.
+
+**Cost.** Way C's figures grow by the duration of the `busrefresh` call
+compared with scenario 1. `T0` is only known to within the commit duration,
+which is reported per run as P3.
+
+---
+
+## 2026-11-15: Fixed phase lengths and repetitions for every approach
+
+**Problem.** `campaigns/scenario-1.json` set duration, settle and pause per
+Way (90, 30 and 150 s of observation), and the warm-up was 5 s with no baseline.
+Failed requests and latency were counted over windows of different length, and
+performance impact had nothing to be compared with.
+
+**Rejected.** Per-approach durations sized to each approach's propagation
+time. An observation shorter than 150 s, which would cut off Way B at 90.2 s.
+
+**Chosen.** Observation 150 s, baseline 60 s, warm-up 30 s, settle 100 s. S1
+needs 20 valid runs per approach, S2 and S3 need 10. A campaign has at most 25
+blocks. The values live in the protocol file only.
+
+**Cost.** A run takes about 6.7 minutes for every approach, also for Way C,
+which converges in seconds. The S1 campaign takes about 6.7 hours.
+
+---
+
+## 2026-11-15: Resource data from the kubelet endpoint, no metrics-server
+
+**Problem.** Criterion 5 needs CPU and memory of the delivery components and
+of the workload. The runner has no resource data so far.
+
+**Rejected.** Installing metrics-server, which adds a component to the cluster
+and only gives sampled rates. `kubectl top`, which depends on metrics-server.
+
+**Chosen.** The kubelet endpoint `/metrics/resource`, read with
+`kubectl get --raw /api/v1/nodes/<node>/proxy/metrics/resource` every 5 s. It
+gives cumulative CPU seconds and the working set per container. If the endpoint
+does not work on the kind cluster, criterion 5 is reported from the declared
+facts only and the build stops for a new decision.
+
+**Cost.** One `kubectl` call per node every 5 s during a run. The runner has to
+parse the Prometheus text format itself.
+
+---
+
+## 2026-11-15: No pass or fail thresholds on the metrics
+
+**Problem.** A threshold such as "at most 0.1 % failed requests" would turn the
+profile of an approach into a verdict.
+
+**Rejected.** Thresholds per metric, which have no source other than my own
+judgement at this stage.
+
+**Chosen.** Protocol version 1 reports the metrics and the outcome flags. It
+computes no verdict and no total score. The decision model in the thesis weighs
+the criteria.
+
+**Cost.** The results do not say by themselves whether an approach is
+acceptable.
+
+---
+
+## 2026-11-15: A coverage gap inside the observation sets a flag
+
+**Problem.** The entry of 2026-11-07 made a run invalid when a pod went
+unobserved for more than 1 000 ms anywhere in the run. A gap after the change
+may be the approach making a pod unresponsive. Excluding such runs removes bad
+behaviour from the data.
+
+**Rejected.** Keeping the strict rule for the whole run. Dropping the coverage
+rule completely, which would also accept a baseline in which a pod was not
+observed.
+
+**Chosen.** A coverage gap over 1 000 ms in the baseline `B`, or fewer than 3
+pods seen in `B`, still makes the run invalid. A gap inside the observation
+interval `H` sets the flag `LOW_RESOLUTION` and the run stays valid. Its timing
+metrics get the wider upper bound, its availability and latency figures count in
+full. This replaces that part of the entry of 2026-11-07. Repeating invalid runs
+stays.
+
+**Cost.** Timing metrics of flagged runs are less precise, and the flag has to
+be reported per approach.
+
+---
+
+## 2026-11-15: Three scenarios on the same core
+
+**Problem.** A valid change alone does not show what an approach does with a
+bad configuration or when its delivery components are down.
+
+**Rejected.** A separate runner per scenario. Scenario steps written into the
+approach descriptors, which would let an approach shape its own test.
+
+**Chosen.** A scenario is a file with timed steps that are the same for every
+approach, executed by the core. S1 valid change: commit v2 at 0 s, 20 valid
+runs. S2 invalid configuration: commit v2 with `timeoutMs` `abc` at 0 s, commit
+v3 with `timeoutMs` 1000 at 120 s, 10 valid runs. S3 infrastructure outage:
+`infraDown` at 0 s, commit v2 at 30 s, `deletePod` at 60 s, `infraUp` at 120 s,
+10 valid runs. Offsets count from the end of the baseline, and the observation
+lasts 150 s after the last step.
+
+**Cost.** One S2 or S3 run takes about 8.7 minutes. All three campaigns need
+about 15 hours. The 120 s before the fix in S2 are a fixed detection time and
+are not a result. S3 takes all delivery components of an approach down at once.
+
+---
+
+## 2026-11-15: Readiness gate in probe-service behind CONFIG_GATE_ENABLED
+
+**Problem.** An invalid `timeoutMs` changes nothing in the service today.
+`/probe` answers 200 and the pod stays ready, so S2 would repeat the
+propagation numbers of S1.
+
+**Rejected.** A gate in CI, in an admission controller or in the Config Server,
+which sits at a different place for each approach. S2 with the gate both on and
+off, which doubles the campaign for a variant that shows nothing new.
+
+**Chosen.** A health indicator with the rules of `/config-health`, part of the
+readiness group only when `CONFIG_GATE_ENABLED` is `true`. The image becomes
+`probe-service:0.2.0` and is used in all three scenarios. The core sets the
+variable on the Deployment after `deploy`, for every approach alike. S1 and S3
+run with the gate off, S2 runs with the gate on only.
+
+**Cost.** probe-service changes once, so the scenario 1 data is pilot data and
+is not compared with the new results. The results of S2 hold for a readiness
+gate, other gate positions are not measured.
+
+---
+
+## 2026-11-15: A commit carries configVersion and timeoutMs in one atomic change
+
+**Problem.** S2 needs a commit that changes the version and an invalid
+`timeoutMs` together. If an approach wrote the two values in two steps, a pod
+could run a mix of both.
+
+**Rejected.** Two commit commands per change. A free-form payload, which would
+let scenarios differ per approach.
+
+**Chosen.** A payload is a `configVersion` and a `timeoutMs`. Every adapter
+applies both in one atomic change: Way A and Way B patch both keys of their
+ConfigMap in one `kubectl patch`, Way C edits both values and makes one Git
+commit. Every payload has its own version, so the version in an answer tells
+which payload the pod runs.
+
+**Cost.** Every descriptor needs the placeholders `{version}` and
+`{timeoutMs}`, and `tools/way-c-change.sh` is split into a commit script and a
+trigger command.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>
