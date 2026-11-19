@@ -166,7 +166,7 @@ public final class Evaluator implements RunJudge {
                 problems.add(String.format(Locale.ROOT, "commit of %s failed with exit code %d",
                         version, commit.exitCode()));
             }
-            if (commit.trigger() != null && commit.trigger().exitCode() != 0) {
+            if (triggerFailed(commit) && !duringOutage(record, commit)) {
                 problems.add(String.format(Locale.ROOT, "trigger after the commit of %s failed with exit code %d",
                         version, commit.trigger().exitCode()));
             }
@@ -175,6 +175,25 @@ public final class Evaluator implements RunJudge {
             problems.add(String.format(Locale.ROOT, "commit %d of the scenario did not run", missing));
         }
         return problems;
+    }
+
+    private static boolean triggerFailed(RunRecord.StepRecord commit) {
+        return commit.trigger() != null && commit.trigger().exitCode() != 0;
+    }
+
+    private static boolean duringOutage(RunRecord record, RunRecord.StepRecord commit) {
+        boolean down = false;
+        for (RunRecord.StepRecord step : record.steps()) {
+            if (step.index() == commit.index()) {
+                return down;
+            }
+            if (step.action() == Scenario.Action.INFRA_DOWN) {
+                down = true;
+            } else if (step.action() == Scenario.Action.INFRA_UP) {
+                down = false;
+            }
+        }
+        return false;
     }
 
     private static Metric metric(MetricId id, String column, Number value) {
@@ -248,8 +267,14 @@ public final class Evaluator implements RunJudge {
                         "%d of %d scheduled requests have no observation (limit ratio %s)",
                         missing, scheduled, Csv.number(protocol.unsentLimitRatio())));
             }
-            Set<String> undeclared = versions(measured);
+            Set<String> undeclared = versions(baseline);
             undeclared.removeAll(declaredVersions);
+            Set<String> undeclaredAfterBaseline = versions(afterBaseline);
+            undeclaredAfterBaseline.removeAll(declaredVersions);
+            if (protocol.unconfiguredVersion() != null) {
+                undeclaredAfterBaseline.remove(protocol.unconfiguredVersion());
+            }
+            undeclared.addAll(undeclaredAfterBaseline);
             if (!undeclared.isEmpty()) {
                 problems.add("versions that no payload of the scenario declares " + undeclared);
             }
@@ -363,6 +388,13 @@ public final class Evaluator implements RunJudge {
             if (metrics.stream().anyMatch(metric -> metric.id() == MetricId.U4 && metric.censored())) {
                 flags.add(RunMetrics.Flag.LOST_UPDATE);
             }
+            if (protocol.unconfiguredVersion() != null
+                    && versions(afterBaseline).contains(protocol.unconfiguredVersion())) {
+                flags.add(RunMetrics.Flag.UNCONFIGURED);
+            }
+            if (record.commits().stream().anyMatch(commit -> triggerFailed(commit) && duringOutage(record, commit))) {
+                flags.add(RunMetrics.Flag.TRIGGER_FAILED);
+            }
             return flags;
         }
 
@@ -370,9 +402,10 @@ public final class Evaluator implements RunJudge {
             return switch (id) {
                 case P1 -> List.of(Propagation.convergence(window, record.t0(),
                         detector.stillServed(observations, oldVersion, window, observation), observation));
-                case P2 -> List.of(Propagation.firstActivation(window, record.t0()));
+                case P2 -> List.of(Propagation.firstActivation(window, record.t0(), observation));
                 case P3 -> List.of(Propagation.commitDuration(record.tCs(), record.t0()));
-                case C1 -> Consistency.window(window);
+                case C1 -> Consistency.window(window,
+                        detector.stillServed(observations, oldVersion, window, observation));
                 case C2 -> List.of(metric(id, "C2",
                         Consistency.reversions(observations, afterBaseline, oldVersion, newVersion)));
                 case C3 -> List.of(metric(id, "C3",

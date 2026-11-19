@@ -132,13 +132,16 @@ really started, for example 90 003.9 ms, and not the planned 90 000 ms.
 - Plan: "The adapter contract".
 - Easy to get wrong: a failing command does not throw. The caller decides what an
   exit code means: `Campaign` stops on a failed `reset` or `deploy`, the evaluator
-  marks a run INVALID on a failed `commit` or `trigger`.
+  marks a run INVALID on a failed `commit`. A failed `trigger` makes the run
+  INVALID while the delivery components are up. Between `infraDown` and `infraUp`
+  it sets the flag `TRIGGER_FAILED`.
 
 #### `CommandAdapter`
 
 - Does: implements the adapter by running the commands of a descriptor.
 - In and out: descriptor, protocol and a `CommandRunner` go in. `fill` replaces
-  `{initialVersion}`, `{initialTimeoutMs}`, `{version}` and `{timeoutMs}`.
+  `{initialVersion}`, `{initialTimeoutMs}`, `{version}` and `{timeoutMs}`. Only
+  `trigger` is run with a timeout, the `triggerTimeoutSeconds` of the protocol.
 - Plan: "The adapter contract" ("one implementation that executes the commands of
   a descriptor file").
 - Easy to get wrong: commands are argument lists and run without a shell, so the
@@ -149,7 +152,9 @@ really started, for example 90 003.9 ms, and not the planned 90 000 ms.
 
 - Does: runs one command.
 - In and out: an argument list and a clock go in, a `ChangeTrigger.Result` comes
-  out. `CommandRunner.process()` is the real one.
+  out. A second `run` takes a timeout in milliseconds. `CommandRunner.process()`
+  is the real one. A fake that implements only the first `run` ignores the
+  timeout.
 - Plan: none directly. It is the seam that lets the tests run without a cluster.
 - Easy to get wrong: every `kubectl` and `git` call of a campaign goes through
   this one interface. The tests replace it with a fake that records the commands.
@@ -164,7 +169,10 @@ really started, for example 90 003.9 ms, and not the planned 90 000 ms.
   the commit).
 - Easy to get wrong: the name is from the old single-run mode. Today it runs every
   command, not only triggers. `fire()` blocks until the command ends, so a command
-  that hangs holds up whatever comes next.
+  that hangs holds up whatever comes next. `fire(timeoutMillis)` stops the
+  command and its child processes after the timeout and returns exit code 124
+  with `timed out after … ms` as the last line of the output. The output goes to
+  a temporary file while the command runs.
 
 ### Running a campaign
 
@@ -587,7 +595,8 @@ third pod, one observation before its switch). P1 = 6 400 − 5 100 = 1 300 ms.
 
 #### P2 time to first activation
 
-`t_first_new − T0`. Empty when v2 never appeared.
+`t_first_new − T0`. When v2 never appeared, the value is 150 000 and censored, as
+for P1.
 
 Example, `PropagationTest.p2_is_t_first_new_minus_T0`: same data, P2 = 6 000 −
 5 100 = 900 ms.
@@ -606,6 +615,10 @@ Example, `PropagationTest.p3_is_T0_minus_t_cs`: `t_cs` 5 000, `T0` 5 100, P3 =
 `max(0, t_last_old − t_first_new)`. The second column `C1_max` adds the
 unobserved time before the first v2 answer and after the last v1 answer, each on
 its own pod. Where a pod has no earlier or later answer, 1 000 ms is used.
+
+C1 is censored in every run in which P1 is censored. Its value is then the window
+seen so far, or 0 when v2 never appeared, and `C1_max` is empty. The reason is in
+the [decision of 2026-11-19](../docs/DECISIONS.md).
 
 Example, `WindowDetectorTest.c1_is_t_last_old_minus_t_first_new` and
 `c1_upper_bound_adds_the_unobserved_time_…`: same three pods. C1 = 6 400 − 6 000

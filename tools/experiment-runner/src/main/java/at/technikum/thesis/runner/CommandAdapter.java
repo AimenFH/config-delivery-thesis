@@ -9,6 +9,7 @@ public final class CommandAdapter implements DeliveryAdapter {
     private final ApproachDescriptor descriptor;
     private final Payload initial;
     private final CommandRunner runner;
+    private final long triggerTimeoutMillis;
 
     public CommandAdapter(ApproachDescriptor descriptor, Protocol protocol) {
         this(descriptor, protocol, CommandRunner.process());
@@ -18,6 +19,7 @@ public final class CommandAdapter implements DeliveryAdapter {
         this.descriptor = descriptor;
         this.initial = new Payload(protocol.initialVersion(), protocol.initialTimeoutMs());
         this.runner = runner;
+        this.triggerTimeoutMillis = protocol.triggerTimeoutSeconds() * 1000L;
     }
 
     @Override
@@ -53,7 +55,7 @@ public final class CommandAdapter implements DeliveryAdapter {
         if (descriptor.trigger() == null) {
             return Optional.empty();
         }
-        return Optional.of(runner.run(fill(descriptor.trigger(), payload), clock));
+        return Optional.of(runner.run(fill(descriptor.trigger(), payload), clock, triggerTimeoutMillis));
     }
 
     @Override

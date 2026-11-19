@@ -145,6 +145,11 @@ the three Way C pods stopped receiving requests after the Bus refresh brought
 `timeoutMs` `abc` and answered again after the fix, see
 [journal entry 06](journal/06-experiment-protocol.md).
 
+The later refresh has to reach the pod. In Way B it does not: the Configuration
+Watcher sends its refresh only to ready pods, so a pod that the gate has made not
+ready stays on the invalid values until someone calls `/actuator/refresh` on it
+directly. See [journal entry 07](journal/07-way-b-gate-deadlock.md).
+
 `/probe` is not affected by the gate. A pod that is not ready still answers
 `/probe` with 200 when it is asked directly. It only stops receiving requests
 through the Service.

@@ -77,7 +77,7 @@ class RunnerTest {
                     + "the pod list and has no sample; resource sampling: node thesis-worker3 runs pods of the "
                     + "pod list and has no sample,,4882,4882,120,0,"), line);
         }
-        assertEquals(1 + 3 * 9 + 3 * 32 + 7 * 3 + 3 * 2, summaryLines.size());
+        assertEquals(1 + 3 * 11 + 3 * 32 + 7 * 3 + 3 * 2, summaryLines.size());
         for (String approach : List.of("way-a", "way-b", "way-c")) {
             assertTrue(summaryLines.contains("1,count," + approach + ",,runs,3,,,,,,,,,,"), summaryLines.toString());
             assertTrue(summaryLines.contains("1,count," + approach + ",,valid,0,,,,,,,,,,"));

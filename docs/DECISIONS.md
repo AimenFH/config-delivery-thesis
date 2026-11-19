@@ -911,6 +911,96 @@ needs the raw files beside them. The copy can be forgotten after a campaign.
 
 ---
 
+## 2026-11-19: The unconfigured version is accepted after the baseline and sets a flag
+
+**Problem.** probe-service answers `v0` when no external configuration reaches
+it, because `demo.configVersion` defaults to `v0` in its `application.yml`. The
+failure table of the plan makes a run INVALID when an answer carries a version
+that no payload declares. A pod that starts without configuration during a run
+is behaviour of the approach, and the rule would exclude such a run and repeat
+it.
+
+**Rejected.** Keeping the rule. Adding `v0` to the declared versions of every
+scenario, which would also accept `v0` in the baseline and give it a place in
+the version order that C3 uses. Changing probe-service so that it cannot start
+without configuration, which would hide the case for every approach.
+
+**Chosen.** The protocol file names the version: `unconfiguredVersion` is `v0`.
+An answer with this version after the baseline leaves the run VALID and sets
+the flag `UNCONFIGURED`. In the baseline `B` it still makes the run INVALID.
+Every other version that no payload declares makes the run INVALID as before. A
+campaign folder saved before this change has no `unconfiguredVersion` in its
+`campaign.json` and is evaluated with the old rule.
+
+**Cost.** P1, C1 and U4 follow v1 and v2 only. A pod that stays on `v0` does
+not delay convergence in these metrics, so a run with the flag has to be read
+together with U2 and the raw data. C3 does not count a pod that falls back from
+v1 or v2 to `v0`. No approach produced `v0` in the smoke campaigns, so the rule
+has only run in unit tests.
+
+---
+
+## 2026-11-19: P2 and C1 are censored when the change has not finished at the end of H
+
+**Problem.** When v2 never appeared, P1 was censored at the length of `H` and
+P2 and C1 were empty. `summary.csv` leaves empty values out, so the same run
+counted for P1 and was missing for P2 and C1. When v2 appeared and v1 was still
+served at the end of `H`, C1 was written as an exact number although the window
+was still open.
+
+**Rejected.** Leaving both empty. Writing C1 as 0 when v2 never appeared: no
+mixed state was observed in such a run, and a 0 would rank a run without
+delivery as the most consistent one.
+
+**Chosen.** P2 follows the rule of P1. When v2 never appeared, P2 is the length
+of `H` and censored. C1 is censored in every run in which P1 is censored. Its
+value is the window seen so far, `t_last_old − t_first_new`, or 0 when v2 never
+appeared, which `runs.csv` shows as `>0`. `C1_max` is empty for a censored C1,
+because an open window has no upper bound. A censored value enters the
+statistics as larger than every number, as for P1.
+
+**Cost.** A run that never delivers counts as the worst case for C1, although
+its replicas never disagreed. The median of C1 is censored when half of the
+runs of an approach are. This changes the definitions of P2 and C1 in the plan
+of 2026-11-15.
+
+---
+
+## 2026-11-19: A failed trigger during an outage sets a flag, and a trigger gets 15 seconds
+
+**Problem.** In S3 the trigger of Way C is `kubectl exec` into the Config
+Server pod, which the scenario has scaled to 0. The command failed after 60.0 s
+with exit code 1. The failure table makes a run with a failed trigger INVALID,
+so all three Way C attempts of the S3 smoke campaign were INVALID and the
+campaign ended with exit code 2. The step executor waits for a step to finish,
+so the 60 s also moved `deletePod` from 150 s to about 182 s, for Way C only.
+
+**Rejected.** Keeping the rule, which leaves S3 without a result for Way C.
+Removing the trigger from Way C in S3, which would measure a different approach
+in one scenario. Adding `--pod-running-timeout` to the trigger command of
+Way C, which puts a duration into a descriptor, where the plan allows none.
+Running the trigger in the background, which lets it overlap with `deletePod`
+and `infraUp`.
+
+**Chosen.** The verdict rule and the trigger call both change. A failed trigger
+makes the run INVALID only while the delivery components are up. If the commit
+lies between `infraDown` and `infraUp`, the run stays VALID and gets the flag
+`TRIGGER_FAILED`. A failed `commit` makes the run INVALID in every case. Every
+trigger gets at most `triggerTimeoutSeconds`, 15 s in the protocol file. After
+that the runner stops the command and records exit code 124. The `busrefresh`
+calls of the S1 smoke campaign took about 2.4 s. The slowest commit of that
+campaign, 5.1 s, plus 15 s still ends before the next step of S3, which is 30 s
+after the commit.
+
+**Cost.** A trigger that fails during the outage for a reason of the instrument
+is counted as behaviour of the approach. A trigger slower than 15 s outside an
+outage makes the run INVALID. The three Way C runs of 2026-11-15 evaluate as
+VALID now. They ran without the timeout, so their `deletePod` is 32 to 35 s
+late and they cannot be compared with new runs. On the cluster the timeout has
+run once, in the Way C run of the S3 smoke campaign of 2026-11-19.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>

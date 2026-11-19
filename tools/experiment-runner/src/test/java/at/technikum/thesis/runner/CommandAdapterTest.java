@@ -111,6 +111,32 @@ class CommandAdapterTest {
     }
 
     @Test
+    void onlyTheTriggerRunsWithTheTriggerTimeoutOfTheProtocol() throws Exception {
+        List<String> calls = new ArrayList<>();
+        CommandRunner recording = new CommandRunner() {
+            @Override
+            public ChangeTrigger.Result run(List<String> argv, RunnerClock usedClock) {
+                calls.add("no timeout: " + argv.get(0));
+                return new ChangeTrigger.Result(String.join(" ", argv), 10, 25, 0, "done");
+            }
+
+            @Override
+            public ChangeTrigger.Result run(List<String> argv, RunnerClock usedClock, long timeoutMillis) {
+                calls.add(timeoutMillis + " ms: " + argv.get(0));
+                return new ChangeTrigger.Result(String.join(" ", argv), 10, 25, 0, "done");
+            }
+        };
+        CommandAdapter adapter = new CommandAdapter(descriptor("way-c"), Fixtures.protocol(), recording);
+
+        adapter.reset(clock);
+        adapter.commit(new Payload("v2", "1000"), clock);
+        adapter.trigger(new Payload("v2", "1000"), clock);
+        adapter.sourceCheck(clock);
+
+        assertEquals(List.of("no timeout: bash", "no timeout: bash", "15000 ms: kubectl", "no timeout: bash"), calls);
+    }
+
+    @Test
     void nameInfrastructureAndDeclaredComeFromTheDescriptor() throws Exception {
         CommandAdapter adapter = adapter("way-c");
 

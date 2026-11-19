@@ -174,7 +174,8 @@ the bad commit. The last successful answer came at 185.8 s. From 185.86 s to the
 end of the run every request timed out: 8 707 of 18 000 requests failed. The fix
 was committed at 210 s and v3 was never observed in the remaining 150 s. The cause
 was not verified in the Watcher's logs. I do not know from the data whether the
-Watcher did not send a refresh, could not reach the pods, or something else.
+Watcher did not send a refresh, could not reach the pods, or something else. The
+cause was found on 19 November, see [entry 07](07-way-b-gate-deadlock.md).
 
 Way C served v2 from all three pods, starting at 94.9 s. The last successful
 answer came at 101.6 s, then every request failed until v3 arrived: 5 797 failed
@@ -212,7 +213,8 @@ two versions.
 
 Way B, with the Watcher down: the replacement pod also started with v2, after
 9.67 s. The two other pods switched to v2 at 313.8 s, which is 103.66 s after
-`infraUp` had finished.
+`infraUp` had finished. [Entry 07](07-way-b-gate-deadlock.md#the-watcher-refreshes-when-it-starts)
+explains where the 103.66 s come from.
 
 Way C, with Config Server and RabbitMQ down: the commit to GitHub worked. The
 trigger is `kubectl exec` into the Config Server pod, which did not exist. It

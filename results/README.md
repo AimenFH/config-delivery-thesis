@@ -41,13 +41,16 @@ The format of every file is described in
 | `aggregated/20261115-155726_s1-smoke/` | S1 smoke, protocol version 1 | 6, all VALID |
 | `aggregated/20261115-163837_s2-smoke/` | S2 smoke, protocol version 1 | 3, all VALID |
 | `aggregated/20261115-170505_s3-smoke/` | S3 smoke, protocol version 1 | 5, of which 2 VALID and 3 INVALID |
+| `aggregated/20261119-232500_s3-smoke/` | S3 smoke, with the rules of 2026-11-19 | 5, of which 3 VALID and 2 INVALID |
 
 These are smoke campaigns. The full campaigns have not been run. What the smoke
 runs showed is in
-[journal entry 06](../document/journal/06-experiment-protocol.md).
+[journal entry 06](../document/journal/06-experiment-protocol.md) and, for the
+campaign of 19 November, in
+[journal entry 08](../document/journal/08-open-points-in-the-runner.md).
 
-The raw folders of the three smoke campaigns are 19 MB, 14 MB and 24 MB on disk
-and exist only on my machine.
+The raw folders of the four smoke campaigns are 19 MB, 14 MB, 24 MB and 23 MB on
+disk and exist only on my machine.
 
 ## Re-evaluating a campaign
 

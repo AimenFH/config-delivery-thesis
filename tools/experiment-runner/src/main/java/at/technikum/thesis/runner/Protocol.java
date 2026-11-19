@@ -22,6 +22,7 @@ public record Protocol(
         String initialVersion,
         String initialTimeoutMs,
         String targetVersion,
+        String unconfiguredVersion,
         int settleSeconds,
         int warmupSeconds,
         int baselineSeconds,
@@ -34,6 +35,7 @@ public record Protocol(
         int steadyMaxLatencyMillis,
         int steadySnapshotGapSeconds,
         int steadyTimeoutSeconds,
+        int triggerTimeoutSeconds,
         int scheduleLagLimitMillis,
         double unsentLimitRatio,
         int resourceGapLimitSeconds,
@@ -116,6 +118,7 @@ public record Protocol(
         text(problems, "initialVersion", initialVersion);
         text(problems, "initialTimeoutMs", initialTimeoutMs);
         text(problems, "targetVersion", targetVersion);
+        text(problems, "unconfiguredVersion", unconfiguredVersion);
         positive(problems, "settleSeconds", settleSeconds);
         positive(problems, "warmupSeconds", warmupSeconds);
         positive(problems, "baselineSeconds", baselineSeconds);
@@ -128,6 +131,7 @@ public record Protocol(
         positive(problems, "steadyMaxLatencyMillis", steadyMaxLatencyMillis);
         positive(problems, "steadySnapshotGapSeconds", steadySnapshotGapSeconds);
         positive(problems, "steadyTimeoutSeconds", steadyTimeoutSeconds);
+        positive(problems, "triggerTimeoutSeconds", triggerTimeoutSeconds);
         positive(problems, "scheduleLagLimitMillis", scheduleLagLimitMillis);
         positive(problems, "unsentLimitRatio", unsentLimitRatio);
         positive(problems, "resourceGapLimitSeconds", resourceGapLimitSeconds);
@@ -135,6 +139,10 @@ public record Protocol(
         positive(problems, "bootstrapSeed", bootstrapSeed);
         if (initialVersion != null && initialVersion.equals(targetVersion)) {
             problems.add("initialVersion and targetVersion must differ");
+        }
+        if (unconfiguredVersion != null
+                && (unconfiguredVersion.equals(initialVersion) || unconfiguredVersion.equals(targetVersion))) {
+            problems.add("unconfiguredVersion must differ from initialVersion and targetVersion");
         }
         if (approaches == null || approaches.isEmpty()) {
             problems.add("approaches is empty");

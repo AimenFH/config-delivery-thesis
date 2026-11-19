@@ -182,9 +182,12 @@ Valid runs: {way-a=1, way-b=1, way-c=0}
 Evaluated 5 runs (2 valid) in /…/results/raw/20261115-170505_s3-smoke
 ```
 
-The S3 smoke campaign ended with exit code 2, because Way C has no valid run. This
-is the first open point of the journal entry and it will happen again until that
-point is decided.
+The S3 smoke campaign of 15 November ended with exit code 2, because Way C had no
+valid run. Since 19 November a trigger that fails while the delivery components
+are down sets the flag `TRIGGER_FAILED` and the run stays VALID, see
+[journal entry 08](journal/08-open-points-in-the-runner.md). The S3 smoke
+campaign of 19 November ran with this rule and reached one valid run per
+approach.
 
 VALID says that the instrument worked. It does not say that the approach behaved
 well. In the S2 smoke run Way B is VALID with the flags `FAILED_REQUESTS` and
@@ -374,8 +377,12 @@ Other cases:
 |---|---|---|
 | The runner ends at once with a Java exception that names a file and a field | A campaign, protocol, scenario or descriptor file has an unknown or missing field | Correct the file |
 | Every run of one approach is INVALID with `commit of … failed` | The commit command of the approach fails | Run it by hand with the values of the payload |
-| Every Way C run of S3 is INVALID with `trigger after the commit of v2 failed with exit code 1` | The trigger runs inside the Config Server pod, which S3 has scaled to 0 | Known, see the [open points](journal/06-experiment-protocol.md#open-points) |
-| A run is INVALID with `versions that no payload of the scenario declares [v0]` | A pod answered without external configuration | Known as a possible case, see the open points |
+| A Way C run of S3 has the flag `TRIGGER_FAILED` | The trigger runs inside the Config Server pod, which S3 has scaled to 0. The runner stops it after 15 s | Expected. The run is VALID, see [journal entry 08](journal/08-open-points-in-the-runner.md) |
+| A run outside S3 is INVALID with `trigger after the commit of … failed with exit code 124` | The trigger ran longer than `triggerTimeoutSeconds` | Run the trigger command of the descriptor by hand and see why it is slow |
+| A run has the flag `UNCONFIGURED` | A pod answered `v0`, which means it had no external configuration | Look at U2 and at the raw data of the run to see which pod and for how long |
+| A run is INVALID with `versions that no payload of the scenario declares [v0]` | A pod answered `v0` in the baseline, or the campaign folder was saved before 19 November | The run is repeated by the campaign |
+| A Way B run of S2 has the flag `NOT_RECOVERED` and every request fails to the end of the run | The Watcher sends no refresh to pods that are not ready, and the gate has made all three not ready | Known, see [journal entry 07](journal/07-way-b-gate-deadlock.md). To bring a pod back by hand, send `POST /actuator/refresh` to it through `kubectl port-forward` |
+| A Way B run shows the new version less than 90 s after the commit | The Watcher was restarted less than 90 s before the commit. It sends a refresh 90 s after its start | Wait more than 90 s after a restart of the Watcher before you start a campaign |
 | A run is INVALID with `baseline: …` | A pod was not observed for more than 1 000 ms, a request failed or two versions were seen before the first step | The run is repeated by the campaign. If it happens often, the machine is not quiet |
 
 ## Rollback

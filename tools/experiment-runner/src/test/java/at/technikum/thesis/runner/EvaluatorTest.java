@@ -14,6 +14,8 @@ import static at.technikum.thesis.runner.RunMetrics.Flag.LOW_RESOLUTION;
 import static at.technikum.thesis.runner.RunMetrics.Flag.NOT_CONVERGED;
 import static at.technikum.thesis.runner.RunMetrics.Flag.NOT_RECOVERED;
 import static at.technikum.thesis.runner.RunMetrics.Flag.REGRESSION;
+import static at.technikum.thesis.runner.RunMetrics.Flag.TRIGGER_FAILED;
+import static at.technikum.thesis.runner.RunMetrics.Flag.UNCONFIGURED;
 import static at.technikum.thesis.runner.RunMetrics.Verdict.INVALID;
 import static at.technikum.thesis.runner.RunMetrics.Verdict.VALID;
 import static at.technikum.thesis.runner.TestRuns.A;
@@ -257,6 +259,56 @@ class EvaluatorTest {
     }
 
     @Test
+    void check_3_a_failed_trigger_while_the_infrastructure_is_down_leaves_the_run_valid_with_the_flag_TRIGGER_FAILED() {
+        RunMetrics metrics = s3.evaluate(s3Run(s3Observations(true, true), failedTrigger()));
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(Set.of(TRIGGER_FAILED), metrics.flags());
+        assertTrue(metrics.commitSucceeded());
+        assertEquals(1, value(metrics, "U1"));
+        assertEquals(215_982 - 212_000, value(metrics, "U4"));
+    }
+
+    @Test
+    void check_3_a_trigger_with_exit_code_0_while_the_infrastructure_is_down_sets_no_flag() {
+        RunMetrics metrics = s3.evaluate(s3Run(s3Observations(true, true),
+                new ChangeTrigger.Result("busrefresh", 120_100, 120_300, 0, "")));
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(Set.of(), metrics.flags());
+    }
+
+    @Test
+    void check_3_a_failed_commit_while_the_infrastructure_is_down_still_makes_the_run_invalid() {
+        RunRecord record = TestRuns.run("run-s3", "way-c", "s3-infra-outage", 1, 1, 1, List.of(
+                        step(0, 0, Scenario.Action.INFRA_DOWN, 90_000, 90_500),
+                        commit(1, 30, V2, 120_000, 120_100, 1, null),
+                        step(2, 60, Scenario.Action.DELETE_POD, 150_000, 150_300),
+                        step(3, 120, Scenario.Action.INFRA_UP, 210_000, 212_000)),
+                s3Observations(true, true), samples(0, 360_000), 360_000);
+
+        RunMetrics metrics = s3.evaluate(record);
+
+        assertEquals(INVALID, metrics.verdict());
+        assertEquals(List.of("commit of v2 failed with exit code 1"), metrics.invalidReasons());
+    }
+
+    @Test
+    void check_3_a_failed_trigger_after_the_infrastructure_is_back_makes_the_run_invalid() {
+        RunRecord record = TestRuns.run("run-s3", "way-c", "s3-infra-outage", 1, 1, 1, List.of(
+                        step(0, 0, Scenario.Action.INFRA_DOWN, 90_000, 90_500),
+                        step(1, 30, Scenario.Action.INFRA_UP, 120_000, 122_000),
+                        commit(2, 60, V2, 150_000, 150_100, 0, failedTrigger())),
+                load(0, 18_000, TestRuns.allSwitchAt(156_000, "v1", "v2")), samples(0, 360_000), 360_000);
+
+        RunMetrics metrics = s3.evaluate(record);
+
+        assertEquals(INVALID, metrics.verdict());
+        assertEquals(List.of("trigger after the commit of v2 failed with exit code 124"), metrics.invalidReasons());
+        assertEquals(Set.of(), metrics.flags());
+    }
+
+    @Test
     void check_3_a_commit_and_a_trigger_with_exit_code_0_leave_the_run_valid() {
         RunRecord record = TestRuns.s1("run-1", "way-a", List.of(commit(0, 0, V2, 90_000, 90_100, 0,
                 new ChangeTrigger.Result("busrefresh", 90_100, 90_300, 0, ""))), cleanS1(), samples(0, 240_000));
@@ -346,6 +398,57 @@ class EvaluatorTest {
         assertEquals(VALID, warmup.verdict(), warmup.invalidReasons().toString());
         assertEquals(INVALID, baseline.verdict());
         assertTrue(baseline.invalidReasons().contains("versions that no payload of the scenario declares [v9]"));
+    }
+
+    @Test
+    void check_6_the_unconfigured_version_after_the_baseline_leaves_the_run_valid_with_the_flag_UNCONFIGURED() {
+        RunMetrics metrics = s1.evaluate(TestRuns.s1(replace(cleanS1(), answer(6_000, A, "v0"))));
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(Set.of(UNCONFIGURED), metrics.flags());
+    }
+
+    @Test
+    void check_6_the_unconfigured_version_in_the_first_tick_after_the_baseline_is_accepted() {
+        RunMetrics metrics = s1.evaluate(TestRuns.s1(replace(cleanS1(), answer(4_500, A, "v0"))));
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(Set.of(UNCONFIGURED), metrics.flags());
+    }
+
+    @Test
+    void check_6_the_unconfigured_version_in_the_last_tick_of_B_makes_the_run_invalid() {
+        RunMetrics metrics = s1.evaluate(TestRuns.s1(replace(cleanS1(), answer(4_499, C, "v0"))));
+
+        assertEquals(INVALID, metrics.verdict());
+        assertEquals(List.of("baseline: more than one version [v0, v1]",
+                "versions that no payload of the scenario declares [v0]"), metrics.invalidReasons());
+        assertEquals(Set.of(), metrics.flags());
+    }
+
+    @Test
+    void check_6_another_undeclared_version_beside_the_unconfigured_one_still_makes_the_run_invalid() {
+        RunMetrics metrics = s1.evaluate(TestRuns.s1(
+                replace(cleanS1(), answer(6_000, A, "v0"), answer(6_003, A, "v9"))));
+
+        assertEquals(INVALID, metrics.verdict());
+        assertEquals(List.of("versions that no payload of the scenario declares [v9]"), metrics.invalidReasons());
+    }
+
+    @Test
+    void check_6_a_campaign_saved_without_an_unconfigured_version_keeps_the_strict_rule() throws Exception {
+        Protocol old = Fixtures.protocolWith(tree -> tree.remove("unconfiguredVersion"));
+        List<ApproachDescriptor> approaches = new ArrayList<>();
+        for (String approach : old.approaches()) {
+            approaches.add(ApproachDescriptor.read(Fixtures.ROOT.resolve(approach)));
+        }
+
+        RunMetrics metrics = new Evaluator(old, s1Scenario, approaches)
+                .evaluate(TestRuns.s1(replace(cleanS1(), answer(6_000, A, "v0"))));
+
+        assertEquals(INVALID, metrics.verdict());
+        assertEquals(List.of("versions that no payload of the scenario declares [v0]"), metrics.invalidReasons());
+        assertEquals(Set.of(), metrics.flags());
     }
 
     @Test
@@ -521,8 +624,9 @@ class EvaluatorTest {
         assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
         assertEquals(Set.of(NOT_CONVERGED), metrics.flags());
         assertEquals(new Metric(MetricId.P1, "P1", 150_000.0, true, null), metric(metrics, "P1"));
-        assertEquals(95_002 - 90_100, value(metrics, "P2"));
-        assertEquals(239_982 - 95_002, value(metrics, "C1"));
+        assertEquals(new Metric(MetricId.P2, "P2", 95_002.0 - 90_100, false, null), metric(metrics, "P2"));
+        assertEquals(new Metric(MetricId.C1, "C1", 239_982.0 - 95_002, true, null), metric(metrics, "C1"));
+        assertNull(value(metrics, "C1_max"));
     }
 
     @Test
@@ -532,9 +636,18 @@ class EvaluatorTest {
         assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
         assertEquals(Set.of(NOT_CONVERGED), metrics.flags());
         assertEquals(new Metric(MetricId.P1, "P1", 150_000.0, true, null), metric(metrics, "P1"));
-        assertNull(value(metrics, "P2"));
-        assertNull(value(metrics, "C1"));
+        assertEquals(new Metric(MetricId.P2, "P2", 150_000.0, true, null), metric(metrics, "P2"));
+        assertEquals(new Metric(MetricId.C1, "C1", 0.0, true, null), metric(metrics, "C1"));
         assertNull(value(metrics, "C1_max"));
+    }
+
+    @Test
+    void the_runs_csv_row_of_a_run_without_the_new_version_has_a_censored_p1_p2_and_c1() {
+        RunRecord record = TestRuns.s1(load(0, 12_000, (pod, at) -> "v1"));
+
+        List<String> row = Evaluator.row(record, s1.evaluate(record), List.of("P1", "P2", "C1", "C1_max"));
+
+        assertEquals(List.of(">150000", ">150000", ">0", ""), row.subList(9, row.size()));
     }
 
     @Test
@@ -873,10 +986,19 @@ class EvaluatorTest {
         return reroute(reroute(observations, 7_520, 7_800, A, B), 7_800, 18_000, A, D);
     }
 
+    private static ChangeTrigger.Result failedTrigger() {
+        return new ChangeTrigger.Result("busrefresh", 120_100, 135_100, ChangeTrigger.TIMED_OUT,
+                "timed out after 15000 ms");
+    }
+
     private static RunRecord s3Run(List<Observation> observations) {
+        return s3Run(observations, null);
+    }
+
+    private static RunRecord s3Run(List<Observation> observations, ChangeTrigger.Result trigger) {
         return TestRuns.run("run-s3", "way-c", "s3-infra-outage", 1, 1, 1, List.of(
                         step(0, 0, Scenario.Action.INFRA_DOWN, 90_000, 90_500),
-                        commit(1, 30, V2, 120_000, 120_100),
+                        commit(1, 30, V2, 120_000, 120_100, 0, trigger),
                         step(2, 60, Scenario.Action.DELETE_POD, 150_000, 150_300),
                         step(3, 120, Scenario.Action.INFRA_UP, 210_000, 212_000)),
                 observations, samples(0, 360_000), 360_000);

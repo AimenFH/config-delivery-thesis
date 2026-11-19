@@ -1,0 +1,83 @@
+{
+  "runId" : "20261120-000019_way-c_b01_a1",
+  "campaign" : "20261119-232500_s3-smoke",
+  "approach" : "way-c",
+  "scenario" : "s3-infra-outage",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 3,
+  "attempt" : 1,
+  "runStartedAt" : "2026-11-19T23:03:10.388Z",
+  "runStartedAtEpochMillis" : 1795129390388,
+  "gate" : false,
+  "loadStartedAt" : 1.1335,
+  "runEndAt" : 360001.656708,
+  "scheduled" : 18001,
+  "sourceCheck" : {
+    "command" : "bash -c git -C \"${CONFIG_REPO:-$HOME/config-repo}\" ls-remote -q origin HEAD",
+    "startedAt" : -167060.037125,
+    "finishedAt" : -166490.04570800002,
+    "exitCode" : 0,
+    "output" : "4f93edc07462933daf62c7805e1d43e58651c84d\tHEAD"
+  },
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "infraDown",
+    "payload" : null,
+    "startedAt" : 90002.395625,
+    "finishedAt" : 90177.048042,
+    "exitCode" : 0,
+    "output" : "deployment.apps/config-server scaled\ndeployment.apps/rabbitmq scaled",
+    "trigger" : null,
+    "detail" : "platform/config-server 1 -> 0, platform/rabbitmq 1 -> 0"
+  }, {
+    "index" : 1,
+    "atSeconds" : 30,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 120008.294042,
+    "finishedAt" : 121906.851625,
+    "exitCode" : 0,
+    "output" : "pushed v2 with timeoutMs 1000",
+    "trigger" : {
+      "command" : "kubectl -n platform exec deploy/config-server -- curl -sf -X POST localhost:8888/actuator/busrefresh",
+      "startedAt" : 121907.217042,
+      "finishedAt" : 136948.095292,
+      "exitCode" : 124,
+      "output" : "timed out after 15000 ms"
+    },
+    "detail" : null
+  }, {
+    "index" : 2,
+    "atSeconds" : 60,
+    "action" : "deletePod",
+    "payload" : null,
+    "startedAt" : 150000.91,
+    "finishedAt" : 150104.93,
+    "exitCode" : 0,
+    "output" : "pod \"probe-service-785487458c-9cw8h\" deleted from thesis namespace",
+    "trigger" : null,
+    "detail" : "probe-service-785487458c-9cw8h"
+  }, {
+    "index" : 3,
+    "atSeconds" : 120,
+    "action" : "infraUp",
+    "payload" : null,
+    "startedAt" : 210001.656708,
+    "finishedAt" : 210109.242542,
+    "exitCode" : 0,
+    "output" : "deployment.apps/config-server scaled\ndeployment.apps/rabbitmq scaled",
+    "trigger" : null,
+    "detail" : "platform/config-server 0 -> 1, platform/rabbitmq 0 -> 1"
+  } ],
+  "errors" : [ ],
+  "tCs" : 120008.294042,
+  "t0" : 121906.851625,
+  "verdict" : "VALID",
+  "invalidReasons" : [ ],
+  "flags" : [ "LOST_UPDATE", "TRIGGER_FAILED" ]
+}

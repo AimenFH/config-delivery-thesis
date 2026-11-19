@@ -14,7 +14,10 @@ final class Propagation {
         return new Metric(MetricId.P1, "P1", value, false, null);
     }
 
-    static Metric firstActivation(WindowDetector.Window window, Double t0) {
+    static Metric firstActivation(WindowDetector.Window window, Double t0, Interval observation) {
+        if (window.firstNewAt() == null) {
+            return new Metric(MetricId.P2, "P2", observation.lengthMillis(), true, null);
+        }
         Double value = window.firstNewAt() == null || t0 == null ? null : Double.valueOf(window.firstNewAt() - t0);
         return new Metric(MetricId.P2, "P2", value, false, null);
     }

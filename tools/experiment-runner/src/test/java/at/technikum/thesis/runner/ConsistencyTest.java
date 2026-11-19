@@ -14,10 +14,26 @@ class ConsistencyTest {
 
     @Test
     void c1_and_its_upper_bound_are_reported_as_two_columns() {
-        List<Metric> metrics = Consistency.window(new WindowDetector.Window(6_000.0, 6_400.0, 400.0, 600.0));
+        List<Metric> metrics = Consistency.window(new WindowDetector.Window(6_000.0, 6_400.0, 400.0, 600.0), false);
 
         assertEquals(List.of(new Metric(MetricId.C1, "C1", 400.0, false, null),
                 new Metric(MetricId.C1, "C1_max", 600.0, false, null)), metrics);
+    }
+
+    @Test
+    void c1_is_censored_at_the_window_seen_so_far_and_has_no_upper_bound_when_v1_is_still_served_at_the_end() {
+        List<Metric> metrics = Consistency.window(new WindowDetector.Window(6_000.0, 9_900.0, 3_900.0, 4_100.0), true);
+
+        assertEquals(List.of(new Metric(MetricId.C1, "C1", 3_900.0, true, null),
+                new Metric(MetricId.C1, "C1_max", null, false, null)), metrics);
+    }
+
+    @Test
+    void c1_is_censored_at_zero_when_v2_is_never_observed() {
+        List<Metric> metrics = Consistency.window(new WindowDetector.Window(null, 9_900.0, null, null), true);
+
+        assertEquals(List.of(new Metric(MetricId.C1, "C1", 0.0, true, null),
+                new Metric(MetricId.C1, "C1_max", null, false, null)), metrics);
     }
 
     @Test

@@ -71,19 +71,30 @@ class PropagationTest {
     void p2_is_t_first_new_minus_T0() {
         WindowDetector.Window window = detector.window(switches(6_000, 6_200, 6_500), "v1", "v2", T_CS);
 
-        Metric p2 = Propagation.firstActivation(window, T0);
+        Metric p2 = Propagation.firstActivation(window, T0, H);
 
         assertEquals("P2", p2.column());
         assertEquals(6_000 - 5_100, p2.value());
+        assertFalse(p2.censored());
     }
 
     @Test
-    void p2_is_empty_when_v2_is_never_observed() {
+    void p2_is_censored_at_the_length_of_H_when_v2_is_never_observed() {
         WindowDetector.Window window = detector.window(
                 switches(Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY, Double.POSITIVE_INFINITY),
                 "v1", "v2", T_CS);
 
-        assertNull(Propagation.firstActivation(window, T0).value());
+        assertEquals(new Metric(MetricId.P2, "P2", 150_000.0, true, null),
+                Propagation.firstActivation(window, T0, H));
+    }
+
+    @Test
+    void p2_keeps_its_value_when_v2_arrived_and_v1_is_still_served_at_the_end_of_H() {
+        WindowDetector.Window window = detector.window(
+                switches(6_000, 6_200, Double.POSITIVE_INFINITY), "v1", "v2", T_CS);
+
+        assertEquals(new Metric(MetricId.P2, "P2", 6_000.0 - 5_100, false, null),
+                Propagation.firstActivation(window, T0, H));
     }
 
     @Test
@@ -99,7 +110,7 @@ class PropagationTest {
         WindowDetector.Window window = detector.window(switches(6_000, 6_200, 6_500), "v1", "v2", T_CS);
 
         assertNull(Propagation.convergence(window, null, false, H).value());
-        assertNull(Propagation.firstActivation(window, null).value());
+        assertNull(Propagation.firstActivation(window, null, H).value());
         assertNull(Propagation.commitDuration(T_CS, null).value());
     }
 

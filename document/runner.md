@@ -147,6 +147,7 @@ and no campaign can override it.
 | `requestTimeoutMillis` | 2000 | Connect and request timeout |
 | `initialVersion`, `initialTimeoutMs` | `v1`, `1000` | State every run starts from |
 | `targetVersion` | `v2` | Must differ from `initialVersion`. The versions of a run come from the scenario file |
+| `unconfiguredVersion` | `v0` | The version probe-service answers without external configuration. Accepted after the baseline, with the flag `UNCONFIGURED` |
 | `settleSeconds` | 100 | Wait after the rollout |
 | `warmupSeconds` | 30 | Load that is not evaluated |
 | `baselineSeconds` | 60 | Length of the baseline `B` |
@@ -159,6 +160,7 @@ and no campaign can override it.
 | `steadyMaxLatencyMillis` | 200 | Slowest allowed answer in a snapshot |
 | `steadySnapshotGapSeconds` | 10 | Time between two snapshots |
 | `steadyTimeoutSeconds` | 120 | Limit for the steady check, and the `--timeout` of every rollout wait |
+| `triggerTimeoutSeconds` | 15 | Longest time a `trigger` may run. After that the runner stops it and records exit code 124 |
 | `scheduleLagLimitMillis` | 100 | Instrument check: a request may start this late |
 | `unsentLimitRatio` | 0.01 | Instrument check: share of scheduled requests without an observation |
 | `resourceGapLimitSeconds` | 15 | Instrument check: longest gap between resource samples of a node |
@@ -292,7 +294,7 @@ One run, with the step numbers of the plan:
 | 4 | Settle: wait 100 s | |
 | 5 | `InvariantCheck`, all infrastructure Deployments of all approaches up, the same image id as in the first run, steady state | Campaign stops |
 | 6 | Read the pod lists and the infrastructure state, start a new clock, the load and the resource sampler | |
-| 7 | Execute the steps of the scenario, the first one at 90 s | A failed core step stops the campaign. A failed `commit` or `trigger` makes the run INVALID |
+| 7 | Execute the steps of the scenario, the first one at 90 s | A failed core step stops the campaign. A failed `commit` makes the run INVALID. A failed `trigger` makes it INVALID unless the commit lies between `infraDown` and `infraUp` |
 | 8 | Keep the load until 150 s after the start of the last step | |
 | 9 | Stop load and sampler, restore the infrastructure, read pod list and events, evaluate, save the four run files | Campaign stops after saving |
 
@@ -485,10 +487,10 @@ a flag on a VALID run.
 | A pod unobserved for more than 1 000 ms in `B`, or fewer than 3 pods in `B` | `baseline: pod … was unobserved`, `baseline: only … replicas` |
 | A failed request in `B` | `baseline: … failed requests` |
 | More than one version in `B` | `baseline: more than one version` |
-| `commit` or `trigger` with an exit code other than 0, or a commit that did not run | `commit of … failed`, `trigger after the commit of … failed`, `commit … of the scenario did not run` |
+| `commit` with an exit code other than 0, a commit that did not run, or a `trigger` with an exit code other than 0 while the delivery components are up | `commit of … failed`, `commit … of the scenario did not run`, `trigger after the commit of … failed` |
 | A request that started more than 100 ms late | `schedule lag over 100 ms` |
 | More than 1 % of the scheduled requests without an observation | `… scheduled requests have no observation` |
-| An answer with a version that no payload declares | `versions that no payload of the scenario declares` |
+| An answer with a version that no payload declares. The `unconfiguredVersion` is accepted after `B` | `versions that no payload of the scenario declares` |
 | No resource samples, a node without samples, or a gap over 15 s | `no resource samples`, `resource sampling: …` |
 
 The last four are checked from the start of `B` to the end of the run. The warm-up
@@ -502,6 +504,8 @@ is not checked.
 | `LOW_RESOLUTION` | A pod went unobserved for more than 1 000 ms after the baseline |
 | `NOT_RECOVERED` | R1 is censored (S2) |
 | `LOST_UPDATE` | U4 is censored (S3) |
+| `UNCONFIGURED` | A pod answered the `unconfiguredVersion` after the baseline |
+| `TRIGGER_FAILED` | A `trigger` failed or timed out between `infraDown` and `infraUp` (S3) |
 
 ## Re-evaluating a folder
 

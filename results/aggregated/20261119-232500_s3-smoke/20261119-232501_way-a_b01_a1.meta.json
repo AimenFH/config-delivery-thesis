@@ -1,0 +1,71 @@
+{
+  "runId" : "20261119-232501_way-a_b01_a1",
+  "campaign" : "20261119-232500_s3-smoke",
+  "approach" : "way-a",
+  "scenario" : "s3-infra-outage",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 1,
+  "attempt" : 1,
+  "runStartedAt" : "2026-11-19T22:27:43.584Z",
+  "runStartedAtEpochMillis" : 1795127263584,
+  "gate" : false,
+  "loadStartedAt" : 2.707333,
+  "runEndAt" : 360005.9265,
+  "scheduled" : 18001,
+  "sourceCheck" : null,
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "infraDown",
+    "payload" : null,
+    "startedAt" : 90004.655917,
+    "finishedAt" : 90109.766083,
+    "exitCode" : 0,
+    "output" : "deployment.apps/reloader-reloader scaled",
+    "trigger" : null,
+    "detail" : "platform/reloader-reloader 1 -> 0"
+  }, {
+    "index" : 1,
+    "atSeconds" : 30,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 120004.601875,
+    "finishedAt" : 120063.402042,
+    "exitCode" : 0,
+    "output" : "configmap/demo-config patched",
+    "trigger" : null,
+    "detail" : null
+  }, {
+    "index" : 2,
+    "atSeconds" : 60,
+    "action" : "deletePod",
+    "payload" : null,
+    "startedAt" : 150005.266167,
+    "finishedAt" : 150120.187042,
+    "exitCode" : 0,
+    "output" : "pod \"probe-service-7f475895c6-bpwt6\" deleted from thesis namespace",
+    "trigger" : null,
+    "detail" : "probe-service-7f475895c6-bpwt6"
+  }, {
+    "index" : 3,
+    "atSeconds" : 120,
+    "action" : "infraUp",
+    "payload" : null,
+    "startedAt" : 210005.9265,
+    "finishedAt" : 210076.2765,
+    "exitCode" : 0,
+    "output" : "deployment.apps/reloader-reloader scaled",
+    "trigger" : null,
+    "detail" : "platform/reloader-reloader 0 -> 1"
+  } ],
+  "errors" : [ ],
+  "tCs" : 120004.601875,
+  "t0" : 120063.402042,
+  "verdict" : "INVALID",
+  "invalidReasons" : [ "schedule lag over 100 ms for 10 requests, highest 259.99345899999025 ms" ],
+  "flags" : [ "FAILED_REQUESTS", "LOW_RESOLUTION", "LOST_UPDATE" ]
+}

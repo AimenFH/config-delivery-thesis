@@ -1,0 +1,71 @@
+{
+  "runId" : "20261119-235135_way-b_b01_a2",
+  "campaign" : "20261119-232500_s3-smoke",
+  "approach" : "way-b",
+  "scenario" : "s3-infra-outage",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 2,
+  "attempt" : 2,
+  "runStartedAt" : "2026-11-19T22:54:19.334Z",
+  "runStartedAtEpochMillis" : 1795128859334,
+  "gate" : false,
+  "loadStartedAt" : 1.22875,
+  "runEndAt" : 360000.462708,
+  "scheduled" : 18000,
+  "sourceCheck" : null,
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "infraDown",
+    "payload" : null,
+    "startedAt" : 90002.163916,
+    "finishedAt" : 90104.38725,
+    "exitCode" : 0,
+    "output" : "deployment.apps/config-watcher scaled",
+    "trigger" : null,
+    "detail" : "platform/config-watcher 1 -> 0"
+  }, {
+    "index" : 1,
+    "atSeconds" : 30,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 120002.507791,
+    "finishedAt" : 120063.262708,
+    "exitCode" : 0,
+    "output" : "configmap/demo-config patched",
+    "trigger" : null,
+    "detail" : null
+  }, {
+    "index" : 2,
+    "atSeconds" : 60,
+    "action" : "deletePod",
+    "payload" : null,
+    "startedAt" : 150003.317666,
+    "finishedAt" : 150103.214,
+    "exitCode" : 0,
+    "output" : "pod \"probe-service-8655ff9488-b2cd6\" deleted from thesis namespace",
+    "trigger" : null,
+    "detail" : "probe-service-8655ff9488-b2cd6"
+  }, {
+    "index" : 3,
+    "atSeconds" : 120,
+    "action" : "infraUp",
+    "payload" : null,
+    "startedAt" : 210000.462708,
+    "finishedAt" : 210059.721583,
+    "exitCode" : 0,
+    "output" : "deployment.apps/config-watcher scaled",
+    "trigger" : null,
+    "detail" : "platform/config-watcher 0 -> 1"
+  } ],
+  "errors" : [ ],
+  "tCs" : 120002.507791,
+  "t0" : 120063.262708,
+  "verdict" : "VALID",
+  "invalidReasons" : [ ],
+  "flags" : [ ]
+}

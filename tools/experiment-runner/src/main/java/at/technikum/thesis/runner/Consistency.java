@@ -11,7 +11,13 @@ final class Consistency {
     private Consistency() {
     }
 
-    static List<Metric> window(WindowDetector.Window window) {
+    static List<Metric> window(WindowDetector.Window window, boolean stillServed) {
+        if (stillServed) {
+            double seen = window.windowMillis() == null ? 0 : window.windowMillis();
+            return List.of(
+                    new Metric(MetricId.C1, "C1", seen, true, null),
+                    new Metric(MetricId.C1, "C1_max", null, false, null));
+        }
         return List.of(
                 new Metric(MetricId.C1, "C1", window.windowMillis(), false, null),
                 new Metric(MetricId.C1, "C1_max", window.windowMaxMillis(), false, null));

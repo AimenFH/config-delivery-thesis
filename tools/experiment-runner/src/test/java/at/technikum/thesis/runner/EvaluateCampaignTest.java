@@ -108,7 +108,7 @@ class EvaluateCampaignTest {
 
         List<String> lines = Files.readAllLines(dir.resolve("runs.csv"));
         assertTrue(lines.get(2).startsWith("1,20261115-200800_b01_way-b,way-b,1,2,1,VALID,,NOT_CONVERGED,"
-                + ">150000,4902,100,144980,"), lines.get(2));
+                + ">150000,4902,100,>144980,,"), lines.get(2));
         assertTrue(lines.get(4).startsWith("1,20261115-202200_b02_way-b,way-b,2,1,1,INVALID,"
                 + "baseline: 1 failed requests,,"), lines.get(4));
         assertTrue(lines.get(5).startsWith("1,20261115-202900_b02_way-b,way-b,2,1,2,VALID,,,"), lines.get(5));
@@ -147,7 +147,7 @@ class EvaluateCampaignTest {
         assertTrue(lines.stream().anyMatch(line -> line.startsWith("1,difference,way-a,way-c,P1,2,2,0,,,110,,,")),
                 lines.toString());
         assertTrue(lines.stream().anyMatch(line -> line.startsWith("1,sensitivity,way-b,,A1,3,,0,0,0,0,0,0,0,0,")));
-        assertEquals(1 + 3 * 9 + 3 * 32 + 7 * 3 + 3 * 2, lines.size());
+        assertEquals(1 + 3 * 11 + 3 * 32 + 7 * 3 + 3 * 2, lines.size());
     }
 
     @Test

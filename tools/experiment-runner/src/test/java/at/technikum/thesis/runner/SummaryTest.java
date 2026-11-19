@@ -58,10 +58,12 @@ class SummaryTest {
                 run("r4", "way-b", true, true, Set.of(), p1(1_000))), APPROACHES, RESAMPLES, SEED);
 
         assertEquals(List.of("runs=3", "valid=2", "invalid=1", "NOT_CONVERGED=2", "REGRESSION=0",
-                        "FAILED_REQUESTS=0", "LOW_RESOLUTION=1", "NOT_RECOVERED=0", "LOST_UPDATE=0"),
+                        "FAILED_REQUESTS=0", "LOW_RESOLUTION=1", "NOT_RECOVERED=0", "LOST_UPDATE=0",
+                        "UNCONFIGURED=0", "TRIGGER_FAILED=0"),
                 counts(summary, "way-a"));
         assertEquals(List.of("runs=1", "valid=1", "invalid=0", "NOT_CONVERGED=0", "REGRESSION=0",
-                        "FAILED_REQUESTS=0", "LOW_RESOLUTION=0", "NOT_RECOVERED=0", "LOST_UPDATE=0"),
+                        "FAILED_REQUESTS=0", "LOW_RESOLUTION=0", "NOT_RECOVERED=0", "LOST_UPDATE=0",
+                        "UNCONFIGURED=0", "TRIGGER_FAILED=0"),
                 counts(summary, "way-b"));
     }
 
@@ -248,11 +250,11 @@ class SummaryTest {
         assertEquals("protocolVersion,kind,approach,other,metric,n,n_other,censored,min,q1,median,q3,max,"
                 + "ci_low,ci_high,cliffs_delta", lines.get(0));
         assertTrue(lines.subList(1, lines.size()).stream().allMatch(line -> line.startsWith("1,")));
-        assertEquals(1 + 2 * 9 + 2 * 2 + 1, lines.size());
+        assertEquals(1 + 2 * 11 + 2 * 2 + 1, lines.size());
         assertEquals("1,count,way-a,,runs,3,,,,,,,,,,", lines.get(1));
-        assertTrue(lines.get(19).startsWith("1,metric,way-a,,P1,3,,0,1000,1500,2000,2500,3000,"), lines.get(19));
-        assertTrue(lines.get(23).startsWith("1,difference,way-a,way-b,P1,3,3,0,,,-3000,,,"), lines.get(23));
-        assertTrue(lines.get(23).endsWith(",-1"), lines.get(23));
+        assertTrue(lines.get(23).startsWith("1,metric,way-a,,P1,3,,0,1000,1500,2000,2500,3000,"), lines.get(23));
+        assertTrue(lines.get(27).startsWith("1,difference,way-a,way-b,P1,3,3,0,,,-3000,,,"), lines.get(27));
+        assertTrue(lines.get(27).endsWith(",-1"), lines.get(27));
     }
 
     private static List<RunMetrics> twoApproaches() {

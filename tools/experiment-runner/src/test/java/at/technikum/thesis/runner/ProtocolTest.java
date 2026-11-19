@@ -31,6 +31,7 @@ class ProtocolTest {
         assertEquals("v1", protocol.initialVersion());
         assertEquals("1000", protocol.initialTimeoutMs());
         assertEquals("v2", protocol.targetVersion());
+        assertEquals("v0", protocol.unconfiguredVersion());
         assertEquals(100, protocol.settleSeconds());
         assertEquals(30, protocol.warmupSeconds());
         assertEquals(60, protocol.baselineSeconds());
@@ -49,6 +50,7 @@ class ProtocolTest {
         assertEquals(200, protocol.steadyMaxLatencyMillis());
         assertEquals(10, protocol.steadySnapshotGapSeconds());
         assertEquals(120, protocol.steadyTimeoutSeconds());
+        assertEquals(15, protocol.triggerTimeoutSeconds());
         assertEquals(100, protocol.scheduleLagLimitMillis());
         assertEquals(0.01, protocol.unsentLimitRatio());
         assertEquals(15, protocol.resourceGapLimitSeconds());
@@ -112,6 +114,28 @@ class ProtocolTest {
         Protocol protocol = Fixtures.protocolWith(tree -> tree.put("targetVersion", "v1"));
 
         assertEquals(List.of("initialVersion and targetVersion must differ"), protocol.problems());
+    }
+
+    @Test
+    void rejectsAMissingUnconfiguredVersionAndATriggerTimeoutOfZero() throws Exception {
+        Protocol protocol = Fixtures.protocolWith(tree -> {
+            tree.remove("unconfiguredVersion");
+            tree.put("triggerTimeoutSeconds", 0);
+        });
+
+        assertEquals(List.of("unconfiguredVersion is missing", "triggerTimeoutSeconds must be positive"),
+                protocol.problems());
+    }
+
+    @Test
+    void rejectsAnUnconfiguredVersionThatAPayloadOfTheProtocolAlsoUses() throws Exception {
+        Protocol asInitial = Fixtures.protocolWith(tree -> tree.put("unconfiguredVersion", "v1"));
+        Protocol asTarget = Fixtures.protocolWith(tree -> tree.put("unconfiguredVersion", "v2"));
+
+        assertEquals(List.of("unconfiguredVersion must differ from initialVersion and targetVersion"),
+                asInitial.problems());
+        assertEquals(List.of("unconfiguredVersion must differ from initialVersion and targetVersion"),
+                asTarget.problems());
     }
 
     @Test
