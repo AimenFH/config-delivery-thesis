@@ -671,6 +671,246 @@ trigger command.
 
 ---
 
+## 2026-11-15: The block order seed is in the campaign file, the bootstrap seed in the protocol file
+
+**Problem.** The plan names two seeds. The block order "comes from a seed
+stored in the campaign file", and the bootstrap interval uses 10 000 resamples
+with "seed stored", without saying where.
+
+**Rejected.** One seed for both, which would tie the statistics of a campaign
+to its run order. The bootstrap seed in the campaign file, which would let two
+campaigns of the same protocol version compute their intervals differently.
+
+**Chosen.** `seed` in the campaign file is used only by `BlockPlan.draw`.
+`bootstrapSeed` and `bootstrapResamples` are fields of the protocol file. The
+campaign folder keeps a copy of both files in `campaign.json`, so
+`--evaluate` reads the bootstrap seed from there. For every row of
+`summary.csv` the stored seed is combined with the approach name and the column
+name (`Statistics.seed`).
+
+**Cost.** Changing the bootstrap seed means changing the protocol file, which
+is a new protocol version.
+
+---
+
+## 2026-11-15: The baseline ends at the start of the first step of a scenario
+
+**Problem.** The plan defines the baseline `B` as `[t_cs − 60 s, t_cs)`. In S3
+the first step is `infraDown` at 0 s and the commit follows at 30 s. With `t_cs`
+as the end of `B`, the first 30 s of the outage would count as baseline.
+
+**Rejected.** `B` ending at `t_cs` in every scenario. A baseline at a fixed
+90 s on the clock, which ignores that a step starts a few milliseconds late.
+
+**Chosen.** `B` ends at the measured start time of the first step
+(`RunRecord.reference()`), and `H` starts there. In S1 and S2 the first step is
+the commit, so this is `t_cs`, as the plan says. In S3 it is the start of
+`infraDown`. `t_cs` and `T0` still come from the first commit in every
+scenario.
+
+**Cost.** In S3 the baseline and `t_cs` are 30 s apart, which has to be said
+wherever S3 numbers are explained.
+
+---
+
+## 2026-11-15: The scenario decides which metrics are reported
+
+**Problem.** The plan lists the five criteria for S1, E1 to R1 for S2 and U1 to
+U5 for S3, and says the metric functions take an interval so that S2 and S3 can
+reuse them. It does not say whether an S2 or S3 run also reports P1 to O5.
+
+**Rejected.** All 27 metrics in every scenario. P1 and C1 assume one change
+from v1 to v2, which S2 (three versions) and S3 (outage first) do not have, so
+the columns would hold numbers with another meaning.
+
+**Chosen.** `Scenario.reportedMetrics()` reads the structure of the scenario
+file. A scenario with an `infraDown` step reports U1 to U5. Otherwise a scenario
+with invalid versions reports E1 to E4 and R1. Otherwise it reports P1 to O5.
+`NOT_CONVERGED` is set only where P1 is reported, so an S2 or S3 run never
+carries it. `FAILED_REQUESTS` looks at `H` where A1 is reported and at the whole
+run after the baseline elsewhere. `REGRESSION` and `LOW_RESOLUTION` look at the
+whole run after the baseline in every scenario.
+
+**Cost.** `runs.csv` has different columns per scenario. The S2 and S3 smoke
+results have no latency or resource columns, although the raw data for them is
+on disk.
+
+---
+
+## 2026-11-15: Every block contains every approach
+
+**Problem.** The plan says a block contains one run of every approach and that
+blocks continue until every approach has its valid runs. If one approach needs
+more blocks than the others, it is open whether the others still run in those
+blocks.
+
+**Rejected.** Leaving out approaches that already reached their number. The
+later blocks would then no longer be complete blocks, and the approach that
+needed them would run under other conditions than before.
+
+**Chosen.** Every block runs every approach. The campaign checks the target
+only before a new block starts. An approach can therefore end with more valid
+runs than `validRuns`, and all of them enter the statistics.
+
+**Cost.** Up to one extra run per approach and extra block, about 6.7
+minutes each in S1 and 8.7 minutes in S2 and S3. The number of runs per approach can differ, so `n` is reported in
+every row of `summary.csv`.
+
+---
+
+## 2026-11-15: A failed core step stops the campaign
+
+**Problem.** The plan's failure table says what happens when `commit` or
+`trigger` fail (the run is INVALID) and when reset or deploy fail (the campaign
+stops). It does not name a failing `infraDown`, `infraUp` or `deletePod`.
+
+**Rejected.** Marking such a run INVALID and repeating it. These steps are done
+by the core with `kubectl`, the same way for every approach. If one fails, the
+cluster is in an unknown state and the next run would start from it.
+
+**Chosen.** `StepExecutor` throws `CampaignStopped` when a step other than
+`commit` ends with an exit code that is not 0. The load is stopped, the
+infrastructure is scaled back, and the campaign ends with exit code 1. A failed
+`commit` or `trigger` stays a property of the run and makes it INVALID.
+
+**Cost.** One failing `kubectl` call ends a campaign of several hours. The run
+in which the step failed is not written to disk, because it has no complete
+timeline.
+
+---
+
+## 2026-11-15: Rollouts and the restore wait at most steadyTimeoutSeconds
+
+**Problem.** The plan gives one time limit, 120 s, for the steady check in step
+5. It gives none for the rollout after deploy, for the pods going away, or for
+the infrastructure coming back after S3.
+
+**Rejected.** `kubectl` defaults, which can wait for a very long time on a
+rollout that never finishes. A second constant in the protocol file, which the
+plan does not have.
+
+**Chosen.** `kubectl rollout status` and `kubectl wait --for=delete` are called
+with `--timeout=120s`, taken from `steadyTimeoutSeconds`. This covers the
+rollout after deploy, the rollout after the gate variable is set, the pods of
+the deleted Deployment, and the rollout of every scaled infrastructure
+Deployment in the restore. A timeout stops the campaign.
+
+**Cost.** The name of the constant now covers more than the steady check.
+`kubectl delete deployment --wait=true` itself has no timeout.
+
+---
+
+## 2026-11-15: The delivery components of every approach must be up before every run
+
+**Problem.** The plan says all delivery components of all approaches keep
+running in `platform` during every run, so the background load is the same for
+everyone. `InvariantCheck` as described reads only the workload Deployment and
+the Service. After a failed S3 restore a component could stay at 0 replicas
+without anyone noticing.
+
+**Rejected.** Checking only the components of the approach that runs next.
+Trusting the restore of the run before.
+
+**Chosen.** Together with the invariants, the campaign reads every Deployment
+named under `infrastructure` in any descriptor. Each needs at least 1 desired
+replica and all desired replicas ready. Otherwise the campaign stops before the
+load starts.
+
+**Cost.** A few more `kubectl get` calls per run. A component that is slow to
+become ready stops the campaign instead of delaying it.
+
+---
+
+## 2026-11-15: Instrument limits and fixed workload fields live in the protocol file
+
+**Problem.** The plan's constants table does not hold every number the code
+needs: the schedule lag limit of 100 ms, the 1 % limit for unsent requests, the
+15 s resource sampling gap, the steady state numbers, and the fixed fields that
+`InvariantCheck` compares. The table also names valid runs and blocks, which
+differ between a smoke campaign and a full one.
+
+**Rejected.** Constants in the Java code, which a reader of the protocol file
+would not see. Valid runs in the protocol file, which would need a second
+protocol for a smoke campaign.
+
+**Chosen.** The protocol file holds the instrument limits
+(`scheduleLagLimitMillis`, `unsentLimitRatio`, `resourceGapLimitSeconds`,
+`coverageLimitMillis`, the four `steady*` fields, `retriesPerBlock`) and a
+`workload` block with image, container name, requests and limits, readiness
+probe, topology spread and Service fields. `validRuns` and `maxBlocks` are in
+the campaign file. The protocol's `maxBlocks` of 25 is the upper limit, and a
+campaign file that asks for more is rejected.
+
+**Cost.** Two files have to be read to know a campaign. Both are copied into
+`campaign.json` of the campaign folder.
+
+---
+
+## 2026-11-15: "Still served at the end", the length of A2 and short buckets
+
+**Problem.** Three formulas of the plan leave a detail open. "v1 is still
+served at the end of `H`" does not say how long the end is. A2 is a run of
+failed requests "as a time span". A3 and F3 use buckets of 2 s and 1 s, and an
+interval need not be a multiple of them.
+
+**Rejected.** The single last answer as "the end", which depends on one random
+request. Receive times for the span of A2, which would add the 2 s timeout to
+every outage. A shorter last bucket, in which fewer pods answer only because
+fewer requests fall into it.
+
+**Chosen.** A version is still served when a successful answer with it was
+intended in the last `coverageLimitMillis` (1 000 ms) of the interval. O4 uses
+the same last second for "pods answering at the end of `H`". A2 is the number
+of consecutive failed scheduled requests times the period of 20 ms. Buckets
+start at the start of the interval, and a last bucket shorter than the bucket
+length is left out.
+
+**Cost.** An outage of n failed requests is reported as n times 20 ms, which
+is a lower bound of its real length. Up to 2 s at the end of an interval are
+not covered by A3.
+
+---
+
+## 2026-11-15: Raw data is saved before the campaign stops
+
+**Problem.** Two errors can happen after a run has been measured completely:
+the evaluator throws, or the infrastructure does not come back after an S3 run.
+The plan says to stop and "keep what exists", but at that moment the run exists
+only in memory.
+
+**Rejected.** Stopping at once, which loses up to 360 s of measured data that
+could show what went wrong.
+
+**Chosen.** If the evaluation throws, the run is saved with the verdict
+INVALID and the reason "the evaluation failed", then the campaign stops with
+exit code 1. If the restore fails after the timeline was completed, the run is
+evaluated and saved first, then the campaign stops. `runs.csv` and
+`summary.csv` are written in both cases.
+
+**Cost.** A folder can hold a run whose INVALID verdict comes from an error in
+the evaluator. The reason says so, and `--evaluate` judges the run again.
+
+---
+
+## 2026-11-15: Smoke results are copied to results/aggregated
+
+**Problem.** `results/raw/` is not committed, and one smoke campaign is 14 to
+24 MB on disk. Without any committed file the numbers in the journal cannot be
+checked from the repository.
+
+**Rejected.** Committing the raw folders. Committing nothing.
+
+**Chosen.** For each smoke campaign the small files are copied by hand to
+`results/aggregated/<campaign id>/`: `runs.csv`, `summary.csv`,
+`campaign.json`, `fingerprint.json`, the `approaches/` folder and the
+`<run id>.meta.json` files. The observations, the resource samples and the
+cluster files stay in `results/raw/` only. The runner does not make this copy.
+
+**Cost.** The committed files cannot be re-evaluated, because `--evaluate`
+needs the raw files beside them. The copy can be forgotten after a campaign.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>

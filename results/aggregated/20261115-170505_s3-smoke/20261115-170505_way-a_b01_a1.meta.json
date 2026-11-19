@@ -1,0 +1,71 @@
+{
+  "runId" : "20261115-170505_way-a_b01_a1",
+  "campaign" : "20261115-170505_s3-smoke",
+  "approach" : "way-a",
+  "scenario" : "s3-infra-outage",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 1,
+  "attempt" : 1,
+  "runStartedAt" : "2026-11-15T16:07:44.094Z",
+  "runStartedAtEpochMillis" : 1794758864094,
+  "gate" : false,
+  "loadStartedAt" : 2.188208,
+  "runEndAt" : 360005.147292,
+  "scheduled" : 18001,
+  "sourceCheck" : null,
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "infraDown",
+    "payload" : null,
+    "startedAt" : 90003.950167,
+    "finishedAt" : 90105.919375,
+    "exitCode" : 0,
+    "output" : "deployment.apps/reloader-reloader scaled",
+    "trigger" : null,
+    "detail" : "platform/reloader-reloader 1 -> 0"
+  }, {
+    "index" : 1,
+    "atSeconds" : 30,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 120000.961042,
+    "finishedAt" : 120059.020333,
+    "exitCode" : 0,
+    "output" : "configmap/demo-config patched",
+    "trigger" : null,
+    "detail" : null
+  }, {
+    "index" : 2,
+    "atSeconds" : 60,
+    "action" : "deletePod",
+    "payload" : null,
+    "startedAt" : 150009.037667,
+    "finishedAt" : 150110.125542,
+    "exitCode" : 0,
+    "output" : "pod \"probe-service-7f475895c6-ldzvf\" deleted from thesis namespace",
+    "trigger" : null,
+    "detail" : "probe-service-7f475895c6-ldzvf"
+  }, {
+    "index" : 3,
+    "atSeconds" : 120,
+    "action" : "infraUp",
+    "payload" : null,
+    "startedAt" : 210005.147292,
+    "finishedAt" : 210077.058,
+    "exitCode" : 0,
+    "output" : "deployment.apps/reloader-reloader scaled",
+    "trigger" : null,
+    "detail" : "platform/reloader-reloader 0 -> 1"
+  } ],
+  "errors" : [ ],
+  "tCs" : 120000.961042,
+  "t0" : 120059.020333,
+  "verdict" : "VALID",
+  "invalidReasons" : [ ],
+  "flags" : [ "LOST_UPDATE" ]
+}

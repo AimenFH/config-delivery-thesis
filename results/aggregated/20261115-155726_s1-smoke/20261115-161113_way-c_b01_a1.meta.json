@@ -1,0 +1,50 @@
+{
+  "runId" : "20261115-161113_way-c_b01_a1",
+  "campaign" : "20261115-155726_s1-smoke",
+  "approach" : "way-c",
+  "scenario" : "s1-valid-change",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 3,
+  "attempt" : 1,
+  "runStartedAt" : "2026-11-15T15:14:10.597Z",
+  "runStartedAtEpochMillis" : 1794755650597,
+  "gate" : false,
+  "loadStartedAt" : 0.522167,
+  "runEndAt" : 240004.80645899998,
+  "scheduled" : 12001,
+  "sourceCheck" : {
+    "command" : "bash -c git -C \"${CONFIG_REPO:-$HOME/config-repo}\" ls-remote -q origin HEAD",
+    "startedAt" : -171370.4995,
+    "finishedAt" : -170865.286625,
+    "exitCode" : 0,
+    "output" : "46d58888b36ad670d9e0ee4de1515861776f718c\tHEAD"
+  },
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 90004.806459,
+    "finishedAt" : 91694.014042,
+    "exitCode" : 0,
+    "output" : "pushed v2 with timeoutMs 1000",
+    "trigger" : {
+      "command" : "kubectl -n platform exec deploy/config-server -- curl -sf -X POST localhost:8888/actuator/busrefresh",
+      "startedAt" : 91694.207334,
+      "finishedAt" : 94056.310875,
+      "exitCode" : 0,
+      "output" : ""
+    },
+    "detail" : null
+  } ],
+  "errors" : [ ],
+  "tCs" : 90004.806459,
+  "t0" : 91694.014042,
+  "verdict" : "VALID",
+  "invalidReasons" : [ ],
+  "flags" : [ ]
+}

@@ -1,0 +1,52 @@
+{
+  "runId" : "20261115-164716_way-b_b01_a1",
+  "campaign" : "20261115-163837_s2-smoke",
+  "approach" : "way-b",
+  "scenario" : "s2-invalid-config",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 2,
+  "attempt" : 1,
+  "runStartedAt" : "2026-11-15T15:49:55.635Z",
+  "runStartedAtEpochMillis" : 1794757795635,
+  "gate" : true,
+  "loadStartedAt" : 0.389083,
+  "runEndAt" : 360001.082083,
+  "scheduled" : 18000,
+  "sourceCheck" : null,
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "abc"
+    },
+    "startedAt" : 90001.375833,
+    "finishedAt" : 90062.599541,
+    "exitCode" : 0,
+    "output" : "configmap/demo-config patched",
+    "trigger" : null,
+    "detail" : null
+  }, {
+    "index" : 1,
+    "atSeconds" : 120,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v3",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 210001.082083,
+    "finishedAt" : 210057.173125,
+    "exitCode" : 0,
+    "output" : "configmap/demo-config patched",
+    "trigger" : null,
+    "detail" : null
+  } ],
+  "errors" : [ ],
+  "tCs" : 90001.375833,
+  "t0" : 90062.599541,
+  "verdict" : "VALID",
+  "invalidReasons" : [ ],
+  "flags" : [ "FAILED_REQUESTS", "NOT_RECOVERED" ]
+}

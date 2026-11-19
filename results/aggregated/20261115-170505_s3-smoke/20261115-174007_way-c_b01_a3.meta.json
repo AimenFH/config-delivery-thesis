@@ -1,0 +1,83 @@
+{
+  "runId" : "20261115-174007_way-c_b01_a3",
+  "campaign" : "20261115-170505_s3-smoke",
+  "approach" : "way-c",
+  "scenario" : "s3-infra-outage",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 3,
+  "attempt" : 3,
+  "runStartedAt" : "2026-11-15T16:43:03.163Z",
+  "runStartedAtEpochMillis" : 1794760983163,
+  "gate" : false,
+  "loadStartedAt" : 0.540667,
+  "runEndAt" : 360005.3,
+  "scheduled" : 18001,
+  "sourceCheck" : {
+    "command" : "bash -c git -C \"${CONFIG_REPO:-$HOME/config-repo}\" ls-remote -q origin HEAD",
+    "startedAt" : -168900.26741700002,
+    "finishedAt" : -168391.678958,
+    "exitCode" : 0,
+    "output" : "2c5e3bfdad3da832f4192ed5fa0952ae3bbb62ed\tHEAD"
+  },
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "infraDown",
+    "payload" : null,
+    "startedAt" : 90001.268584,
+    "finishedAt" : 90172.149625,
+    "exitCode" : 0,
+    "output" : "deployment.apps/config-server scaled\ndeployment.apps/rabbitmq scaled",
+    "trigger" : null,
+    "detail" : "platform/config-server 1 -> 0, platform/rabbitmq 1 -> 0"
+  }, {
+    "index" : 1,
+    "atSeconds" : 30,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 120000.725834,
+    "finishedAt" : 121785.26525,
+    "exitCode" : 0,
+    "output" : "pushed v2 with timeoutMs 1000",
+    "trigger" : {
+      "command" : "kubectl -n platform exec deploy/config-server -- curl -sf -X POST localhost:8888/actuator/busrefresh",
+      "startedAt" : 121785.392875,
+      "finishedAt" : 181834.578584,
+      "exitCode" : 1,
+      "output" : "error: timed out waiting for the condition"
+    },
+    "detail" : null
+  }, {
+    "index" : 2,
+    "atSeconds" : 60,
+    "action" : "deletePod",
+    "payload" : null,
+    "startedAt" : 181834.703667,
+    "finishedAt" : 181918.647875,
+    "exitCode" : 0,
+    "output" : "pod \"probe-service-785487458c-cdd4z\" deleted from thesis namespace",
+    "trigger" : null,
+    "detail" : "probe-service-785487458c-cdd4z"
+  }, {
+    "index" : 3,
+    "atSeconds" : 120,
+    "action" : "infraUp",
+    "payload" : null,
+    "startedAt" : 210005.3,
+    "finishedAt" : 210106.666542,
+    "exitCode" : 0,
+    "output" : "deployment.apps/config-server scaled\ndeployment.apps/rabbitmq scaled",
+    "trigger" : null,
+    "detail" : "platform/config-server 0 -> 1, platform/rabbitmq 0 -> 1"
+  } ],
+  "errors" : [ ],
+  "tCs" : 120000.725834,
+  "t0" : 121785.26525,
+  "verdict" : "INVALID",
+  "invalidReasons" : [ "trigger after the commit of v2 failed with exit code 1" ],
+  "flags" : [ "LOST_UPDATE" ]
+}

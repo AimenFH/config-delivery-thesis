@@ -1,0 +1,79 @@
+{
+  "campaignId" : "20261115-155726_s1-smoke",
+  "config" : {
+    "name" : "s1-smoke",
+    "protocol" : "protocol/protocol-v1.json",
+    "scenario" : "scenarios/s1-valid-change.json",
+    "validRuns" : 2,
+    "maxBlocks" : 2,
+    "seed" : 20261115
+  },
+  "protocol" : {
+    "protocolVersion" : 1,
+    "namespace" : "thesis",
+    "deployment" : "probe-service",
+    "service" : "probe-service",
+    "url" : "http://localhost:30080/probe",
+    "replicas" : 3,
+    "ratePerSecond" : 50,
+    "requestTimeoutMillis" : 2000,
+    "initialVersion" : "v1",
+    "initialTimeoutMs" : "1000",
+    "targetVersion" : "v2",
+    "settleSeconds" : 100,
+    "warmupSeconds" : 30,
+    "baselineSeconds" : 60,
+    "observationSeconds" : 150,
+    "resourceSamplingSeconds" : 5,
+    "coverageLimitMillis" : 1000,
+    "maxBlocks" : 25,
+    "retriesPerBlock" : 2,
+    "steadyProbes" : 60,
+    "steadyMaxLatencyMillis" : 200,
+    "steadySnapshotGapSeconds" : 10,
+    "steadyTimeoutSeconds" : 120,
+    "scheduleLagLimitMillis" : 100,
+    "unsentLimitRatio" : 0.01,
+    "resourceGapLimitSeconds" : 15,
+    "bootstrapResamples" : 10000,
+    "bootstrapSeed" : 20261115,
+    "approaches" : [ "approaches/way-a/approach.json", "approaches/way-b/approach.json", "approaches/way-c/approach.json" ],
+    "workload" : {
+      "image" : "probe-service:0.2.0",
+      "container" : "probe",
+      "cpuRequest" : "250m",
+      "memoryRequest" : "384Mi",
+      "cpuLimit" : "500m",
+      "memoryLimit" : "512Mi",
+      "readinessPath" : "/actuator/health/readiness",
+      "readinessPort" : 8080,
+      "readinessPeriodSeconds" : 2,
+      "topologyKey" : "kubernetes.io/hostname",
+      "maxSkew" : 1,
+      "whenUnsatisfiable" : "DoNotSchedule",
+      "serviceType" : "NodePort",
+      "servicePort" : 80,
+      "serviceTargetPort" : 8080,
+      "serviceNodePort" : 30080,
+      "serviceSelector" : {
+        "app" : "probe-service"
+      }
+    }
+  },
+  "scenario" : {
+    "name" : "s1-valid-change",
+    "title" : "S1 valid change",
+    "gate" : false,
+    "invalidVersions" : [ ],
+    "steps" : [ {
+      "atSeconds" : 0,
+      "action" : "commit",
+      "payload" : {
+        "configVersion" : "v2",
+        "timeoutMs" : "1000"
+      }
+    } ]
+  },
+  "approaches" : [ "way-a", "way-b", "way-c" ],
+  "blocks" : [ [ "way-a", "way-b", "way-c" ], [ "way-b", "way-a", "way-c" ] ]
+}

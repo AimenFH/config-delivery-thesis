@@ -1,0 +1,38 @@
+{
+  "runId" : "20261115-162447_way-a_b02_a1",
+  "campaign" : "20261115-155726_s1-smoke",
+  "approach" : "way-a",
+  "scenario" : "s1-valid-change",
+  "protocolVersion" : 1,
+  "block" : 2,
+  "positionInBlock" : 2,
+  "attempt" : 1,
+  "runStartedAt" : "2026-11-15T15:27:22.176Z",
+  "runStartedAtEpochMillis" : 1794756442176,
+  "gate" : false,
+  "loadStartedAt" : 0.515291,
+  "runEndAt" : 240004.229125,
+  "scheduled" : 12001,
+  "sourceCheck" : null,
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 90004.229125,
+    "finishedAt" : 90076.950666,
+    "exitCode" : 0,
+    "output" : "configmap/demo-config patched",
+    "trigger" : null,
+    "detail" : null
+  } ],
+  "errors" : [ ],
+  "tCs" : 90004.229125,
+  "t0" : 90076.950666,
+  "verdict" : "VALID",
+  "invalidReasons" : [ ],
+  "flags" : [ ]
+}

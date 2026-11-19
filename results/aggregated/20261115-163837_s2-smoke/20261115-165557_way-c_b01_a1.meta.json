@@ -1,0 +1,70 @@
+{
+  "runId" : "20261115-165557_way-c_b01_a1",
+  "campaign" : "20261115-163837_s2-smoke",
+  "approach" : "way-c",
+  "scenario" : "s2-invalid-config",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 3,
+  "attempt" : 1,
+  "runStartedAt" : "2026-11-15T15:58:48.778Z",
+  "runStartedAtEpochMillis" : 1794758328778,
+  "gate" : true,
+  "loadStartedAt" : 0.456084,
+  "runEndAt" : 360010.28312499996,
+  "scheduled" : 18001,
+  "sourceCheck" : {
+    "command" : "bash -c git -C \"${CONFIG_REPO:-$HOME/config-repo}\" ls-remote -q origin HEAD",
+    "startedAt" : -168042.385708,
+    "finishedAt" : -167545.936666,
+    "exitCode" : 0,
+    "output" : "7d3788ee5baee982c7325419469b05b9cf150a6d\tHEAD"
+  },
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "abc"
+    },
+    "startedAt" : 90001.995584,
+    "finishedAt" : 91747.623125,
+    "exitCode" : 0,
+    "output" : "pushed v2 with timeoutMs abc",
+    "trigger" : {
+      "command" : "kubectl -n platform exec deploy/config-server -- curl -sf -X POST localhost:8888/actuator/busrefresh",
+      "startedAt" : 91747.882292,
+      "finishedAt" : 94095.212292,
+      "exitCode" : 0,
+      "output" : ""
+    },
+    "detail" : null
+  }, {
+    "index" : 1,
+    "atSeconds" : 120,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v3",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 210010.283125,
+    "finishedAt" : 215038.141834,
+    "exitCode" : 0,
+    "output" : "pushed v3 with timeoutMs 1000",
+    "trigger" : {
+      "command" : "kubectl -n platform exec deploy/config-server -- curl -sf -X POST localhost:8888/actuator/busrefresh",
+      "startedAt" : 215038.351834,
+      "finishedAt" : 217154.31975,
+      "exitCode" : 0,
+      "output" : ""
+    },
+    "detail" : null
+  } ],
+  "errors" : [ ],
+  "tCs" : 90001.995584,
+  "t0" : 91747.623125,
+  "verdict" : "VALID",
+  "invalidReasons" : [ ],
+  "flags" : [ "FAILED_REQUESTS", "LOW_RESOLUTION" ]
+}

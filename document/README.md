@@ -20,11 +20,11 @@ kind create cluster --config deploy/kind/kind-cluster.yaml
 ```
 
 ```bash
-(cd services/probe-service && mvn -q -DskipTests package && docker build -t probe-service:0.1.0 .)
+(cd services/probe-service && mvn -q -DskipTests package && docker build -t probe-service:0.2.0 .)
 ```
 
 ```bash
-kind load docker-image probe-service:0.1.0 --name thesis
+kind load docker-image probe-service:0.2.0 --name thesis
 ```
 
 ```bash
@@ -48,25 +48,45 @@ follow [the Way A runbook](runbook-way-a.md#3-run-the-experiment).
 
 | Document | Read it when you want to |
 |---|---|
-| [Architecture](architecture.md) | understand how the setup is built and why |
-| [Probe service API](probe-api.md) | know what each endpoint returns |
-| [Runbook: Way A experiment](runbook-way-a.md) | run the experiment step by step, or fix a known error |
-| [Experiment runner](runner.md) | run the measurement tool, read its output files, understand the coverage check |
-| [Journal](journal/) | read what happened, what broke, and what I learned |
+| [Architecture](architecture.md) | understand how the setup is built and why: the fixed core, the adapter boundary, the timeline of a run, the three scenarios |
+| [Probe service API](probe-api.md) | know what each endpoint returns and how the readiness gate works |
+| [Experiment runner](runner.md) | know the arguments, the input files, the files of a campaign and the exit codes |
+| [Runbook: experiment 1](runbook-experiment-1.md) | run a smoke or full campaign, evaluate a folder again, add an approach or a scenario, fix a stopped campaign |
+| [Runbook: Way A experiment](runbook-way-a.md) | set up the cluster and run Way A by hand |
+| [Code walkthrough](code-walkthrough.md) | learn the code: every class, every metric with a worked example, one run from `main` to `summary.csv` |
+| [Experiment plan](../docs/experiment-plan.md) | read the specification of protocol version 1 |
 | [Design decisions](../docs/DECISIONS.md) | see each decision with the alternatives I rejected |
+| [Results](../results/README.md) | find the result files and know which are committed |
+| [Journal](journal/) | read what happened, what broke, and what I learned |
+
+Journal entries:
+
+| Entry | Milestone |
+|---|---|
+| [01](journal/01-setup-and-first-experiment.md) | Setup and first experiment |
+| [02](journal/02-way-b-and-automatic-triggers.md) | Way B and automatic triggers |
+| [03](journal/03-experiment-runner.md) | Experiment runner |
+| [04](journal/04-change-and-window-detection.md) | Change and window detection |
+| [05](journal/05-platform-namespace-and-kubelet-delay.md) | Platform namespace and kubelet delay |
+| [06](journal/06-experiment-protocol.md) | Experiment protocol version 1 and the smoke campaigns |
 
 ## Project status
 
+State on 2026-11-15.
+
 | Part | State |
 |---|---|
-| Probe service | Working |
+| Probe service | Working, version 0.2.0 with the readiness gate behind `CONFIG_GATE_ENABLED` |
 | Local cluster (kind, 1 control plane and 3 workers) | Working |
-| Way A: environment variables and rolling restart | Working; restart triggered automatically by Reloader, 5 s `preStop` delay so no requests fail |
-| Way B: mounted ConfigMap and runtime refresh | Working; refresh triggered automatically by the Configuration Watcher |
-| Shared `platform` namespace for both triggers | Working; the Watcher discovers pods in `thesis` |
-| Kubelet delay measured, `refreshDelay` tuned | Done: 9.2 s to 77.6 s over 30 values, `refreshDelay` stays at 90 s |
-| Way C: Config Server and Spring Cloud Bus | Planned |
+| Way A: environment variables and rolling restart | Working; restart triggered by Reloader, 5 s `preStop` delay |
+| Way B: mounted ConfigMap and runtime refresh | Working; refresh triggered by the Configuration Watcher, `refreshDelay` 90 s |
+| Way C: Config Server and Spring Cloud Bus | Working; Config Server reads a Git repository on GitHub, refresh over RabbitMQ |
+| Shared `platform` namespace for all delivery components | Working |
+| Experiment plan, protocol version 1 | Frozen on 2026-11-15 |
+| Experiment runner | Working: campaigns in randomized blocks, three scenarios, adapter per approach, resource sampling, 27 metrics computed from raw data, `--evaluate` |
+| Smoke campaign S1 valid change | Run: 6 runs, all VALID |
+| Smoke campaign S2 invalid configuration | Run: 3 runs, all VALID. Way B did not recover, cause not verified |
+| Smoke campaign S3 infrastructure outage | Run: Way A and Way B VALID, Way C INVALID in all 3 attempts, exit code 2 |
+| Full campaigns S1, S2, S3 | Not run. They wait for the open points in [journal entry 06](journal/06-experiment-protocol.md#open-points) |
 | Monitoring with Prometheus and Grafana | Planned, postponed |
-| Experiment runner | Working: constant-rate load, coverage check, raw data per run, change applied after a warm-up, window detected and unit tested |
-| Repeated runs of Way A and Way B | Next |
 | Angular dashboard | Planned, last |

@@ -1,0 +1,56 @@
+{
+  "gitCommit" : "e507d44c7b5b54534d3bf68c2cc901901bcfd193",
+  "gitDirty" : true,
+  "kubernetesClientVersion" : "v1.36.1",
+  "kubernetesServerVersion" : "v1.37.0",
+  "nodeCount" : 4,
+  "workloadImages" : [ {
+    "namespace" : "thesis",
+    "pod" : "probe-service-d54c547db-4cs2m",
+    "container" : "probe",
+    "image" : "docker.io/library/probe-service:0.2.0",
+    "imageId" : "docker.io/library/import-2026-11-15@sha256:6dc120eb979dcaac8033a587668d056985c56c47ad3cc1c71bb0c6597aeebb22"
+  }, {
+    "namespace" : "thesis",
+    "pod" : "probe-service-d54c547db-tpvw9",
+    "container" : "probe",
+    "image" : "docker.io/library/probe-service:0.2.0",
+    "imageId" : "docker.io/library/import-2026-11-15@sha256:6dc120eb979dcaac8033a587668d056985c56c47ad3cc1c71bb0c6597aeebb22"
+  }, {
+    "namespace" : "thesis",
+    "pod" : "probe-service-d54c547db-v8jfc",
+    "container" : "probe",
+    "image" : "docker.io/library/probe-service:0.2.0",
+    "imageId" : "docker.io/library/import-2026-11-15@sha256:6dc120eb979dcaac8033a587668d056985c56c47ad3cc1c71bb0c6597aeebb22"
+  } ],
+  "infrastructureImages" : [ {
+    "namespace" : "platform",
+    "pod" : "config-server-85b9fbd86-m9bc4",
+    "container" : "config-server",
+    "image" : "docker.io/library/config-server:0.1.0",
+    "imageId" : "docker.io/library/import-2026-11-07@sha256:2915cdf84c95f463dacc84ef416012635f8e3f90180b7850eaec238ba076e083"
+  }, {
+    "namespace" : "platform",
+    "pod" : "config-watcher-5b57946567-t4xfq",
+    "container" : "watcher",
+    "image" : "docker.io/springcloud/spring-cloud-kubernetes-configuration-watcher:3.1.6",
+    "imageId" : "sha256:1733d1b4fc28e826f094965d83dd15161b0d0f7ab3a8b245016c303535fdecf9"
+  }, {
+    "namespace" : "platform",
+    "pod" : "rabbitmq-6645d96f68-kbzcf",
+    "container" : "rabbitmq",
+    "image" : "docker.io/library/rabbitmq:3.13",
+    "imageId" : "docker.io/library/rabbitmq@sha256:87178a0ee3e2f52980ba356d38646ed1056705ff2d5ff281f8965456eaa0c1e3"
+  }, {
+    "namespace" : "platform",
+    "pod" : "reloader-reloader-66dc5fd45f-d8kch",
+    "container" : "reloader-reloader",
+    "image" : "ghcr.io/stakater/reloader:v1.4.22",
+    "imageId" : "ghcr.io/stakater/reloader@sha256:def2480040adc164b3a57340e77674eadfd88fb7f0593df25e93297f29c7fd7c"
+  } ],
+  "javaVersion" : "openjdk version \"27.0.1.0.3\" 2026-10-25\nOpenJDK Runtime Environment (build 27.0.1.0.3+1-2)\nOpenJDK 64-Bit Server VM (build 27.0.1.0.3+1-2, mixed mode, sharing)",
+  "os" : "Darwin 27.0.0",
+  "machine" : "arm64",
+  "dockerCpus" : 10,
+  "dockerMemoryBytes" : 8319504384
+}

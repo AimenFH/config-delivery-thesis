@@ -1,0 +1,22 @@
+{
+  "name" : "way-c",
+  "title" : "Config Server and Bus refresh",
+  "manifests" : [ "deploy/way-c-configserver" ],
+  "reset" : [ "bash", "tools/way-c-commit.sh", "{initialVersion}", "{initialTimeoutMs}" ],
+  "commit" : [ "bash", "tools/way-c-commit.sh", "{version}", "{timeoutMs}" ],
+  "trigger" : [ "kubectl", "-n", "platform", "exec", "deploy/config-server", "--", "curl", "-sf", "-X", "POST", "localhost:8888/actuator/busrefresh" ],
+  "sourceCheck" : [ "bash", "-c", "git -C \"${CONFIG_REPO:-$HOME/config-repo}\" ls-remote -q origin HEAD" ],
+  "infrastructure" : [ {
+    "namespace" : "platform",
+    "deployment" : "config-server"
+  }, {
+    "namespace" : "platform",
+    "deployment" : "rabbitmq"
+  } ],
+  "declared" : {
+    "extraComponents" : [ "Config Server", "RabbitMQ" ],
+    "operatorActionsPerChange" : 2,
+    "clusterWideRbac" : false,
+    "serviceCoupling" : "config client and bus libraries, startup dependency"
+  }
+}
