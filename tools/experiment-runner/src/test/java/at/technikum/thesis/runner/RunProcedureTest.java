@@ -116,14 +116,14 @@ class RunProcedureTest {
                 "wait 149880 until 360000",
                 "load stop",
                 "sampler stop"), log.subList(log.indexOf("load start"), log.indexOf("sampler stop") + 1));
-        RunRecord record = world.store.records.get(0);
-        assertTrue(record.gate());
-        assertEquals(90_000, record.tCs());
-        assertEquals(90_120, record.t0());
-        assertEquals(210_000, record.steps().get(1).startedAt());
-        assertEquals(210_120, record.steps().get(1).t0());
-        assertEquals(new Payload("v3", "1000"), record.steps().get(1).payload());
-        assertEquals(360_000, record.runEndAt());
+        RunRecord run = world.store.records.get(0);
+        assertTrue(run.gate());
+        assertEquals(90_000, run.tCs());
+        assertEquals(90_120, run.t0());
+        assertEquals(210_000, run.steps().get(1).startedAt());
+        assertEquals(210_120, run.steps().get(1).t0());
+        assertEquals(new Payload("v3", "1000"), run.steps().get(1).payload());
+        assertEquals(360_000, run.runEndAt());
     }
 
     @Test
@@ -173,36 +173,36 @@ class RunProcedureTest {
 
         assertEquals(0, world.campaign().run());
 
-        RunRecord record = world.store.records.get(0);
-        assertSame(record, world.judge.records.get(0));
-        assertTrue(record.runId().matches("\\d{8}-\\d{6}_way-c_b01_a1"), record.runId());
-        assertEquals(world.store.directory.getFileName().toString(), record.campaign());
-        assertEquals("way-c", record.approach());
-        assertEquals("s3-infra-outage", record.scenario());
-        assertEquals(1, record.protocolVersion());
-        assertEquals(1, record.block());
-        assertEquals(1, record.positionInBlock());
-        assertEquals(1, record.attempt());
-        assertEquals(Instant.ofEpochMilli(record.runStartedAtEpochMillis()).toString(), record.runStartedAt());
-        assertEquals(false, record.gate());
-        assertEquals(2.5, record.loadStartedAt());
-        assertEquals(360_000, record.runEndAt());
-        assertEquals(12_000, record.scheduled());
+        RunRecord run = world.store.records.get(0);
+        assertSame(run, world.judge.records.get(0));
+        assertTrue(run.runId().matches("\\d{8}-\\d{6}_way-c_b01_a1"), run.runId());
+        assertEquals(world.store.directory.getFileName().toString(), run.campaign());
+        assertEquals("way-c", run.approach());
+        assertEquals("s3-infra-outage", run.scenario());
+        assertEquals(1, run.protocolVersion());
+        assertEquals(1, run.block());
+        assertEquals(1, run.positionInBlock());
+        assertEquals(1, run.attempt());
+        assertEquals(Instant.ofEpochMilli(run.runStartedAtEpochMillis()).toString(), run.runStartedAt());
+        assertEquals(false, run.gate());
+        assertEquals(2.5, run.loadStartedAt());
+        assertEquals(360_000, run.runEndAt());
+        assertEquals(12_000, run.scheduled());
         assertEquals(new ChangeTrigger.Result("way-c sourceCheck", -110_350, -110_000, 0, "output of sourceCheck"),
-                record.sourceCheck());
+                run.sourceCheck());
         assertEquals(List.of(INFRA_DOWN, COMMIT, DELETE_POD, INFRA_UP),
-                record.steps().stream().map(RunRecord.StepRecord::action).toList());
+                run.steps().stream().map(RunRecord.StepRecord::action).toList());
         assertEquals(List.of(90_000.0, 120_000.0, 150_000.0, 210_000.0),
-                record.steps().stream().map(RunRecord.StepRecord::startedAt).toList());
-        assertEquals(90_000, record.reference());
-        assertEquals(120_000, record.tCs());
-        assertEquals(120_120, record.t0());
-        assertEquals("platform/config-server 1 -> 0, platform/rabbitmq 3 -> 0", record.steps().get(0).detail());
-        assertEquals("probe-service-f664c8f55-7hfd6", record.steps().get(2).detail());
-        assertEquals("platform/config-server 0 -> 1, platform/rabbitmq 0 -> 3", record.steps().get(3).detail());
-        assertEquals(world.probe.loadObservations, record.observations());
-        assertEquals(world.samplers.get(0).samples, record.resources());
-        assertEquals(List.of(), record.errors());
+                run.steps().stream().map(RunRecord.StepRecord::startedAt).toList());
+        assertEquals(90_000, run.reference());
+        assertEquals(120_000, run.tCs());
+        assertEquals(120_120, run.t0());
+        assertEquals("platform/config-server 1 -> 0, platform/rabbitmq 3 -> 0", run.steps().get(0).detail());
+        assertEquals("probe-service-f664c8f55-7hfd6", run.steps().get(2).detail());
+        assertEquals("platform/config-server 0 -> 1, platform/rabbitmq 0 -> 3", run.steps().get(3).detail());
+        assertEquals(world.probe.loadObservations, run.observations());
+        assertEquals(world.samplers.get(0).samples, run.resources());
+        assertEquals(List.of(), run.errors());
 
         List<RunRecord.PodInfo> pods = List.of(
                 new RunRecord.PodInfo("thesis", "probe-service-f664c8f55-7hfd6", "thesis-worker3", IMAGE_ID,
@@ -213,14 +213,14 @@ class RunProcedureTest {
                         "2026-11-08T16:49:49Z"),
                 new RunRecord.PodInfo("platform", "infra-pod-1", "thesis-worker2", "sha256:infra",
                         "2026-11-15T10:00:00Z"));
-        assertEquals(pods, record.cluster().podsBefore());
-        assertEquals(pods, record.cluster().podsAfter());
+        assertEquals(pods, run.cluster().podsBefore());
+        assertEquals(pods, run.cluster().podsAfter());
         assertEquals(List.of(new RunRecord.InfraState("platform", "config-server", 1, "250m", "384Mi"),
                 new RunRecord.InfraState("platform", "rabbitmq", 3, "250m", "384Mi")),
-                record.cluster().infrastructure());
-        assertEquals("List", record.cluster().events().path("kind").asText());
+                run.cluster().infrastructure());
+        assertEquals("List", run.cluster().events().path("kind").asText());
         assertEquals(List.of("event-of-thesis", "event-of-platform"),
-                record.cluster().events().path("items").findValuesAsText("name"));
+                run.cluster().events().path("items").findValuesAsText("name"));
     }
 
     @Test
@@ -239,9 +239,10 @@ class RunProcedureTest {
 
         world.campaign().run();
 
-        assertEquals(3, world.samplers.size());
+        assertEquals(4, world.samplers.size());
         assertTrue(world.samplers.get(0).clock != world.samplers.get(1).clock);
         assertTrue(world.samplers.get(1).clock != world.samplers.get(2).clock);
+        assertTrue(world.samplers.get(2).clock != world.samplers.get(3).clock);
     }
 
     @Test
@@ -272,15 +273,15 @@ class RunProcedureTest {
 
         assertEquals(0, world.campaign().run());
 
-        RunRecord record = world.store.records.get(0);
-        assertEquals(2, record.errors().size());
-        assertTrue(record.errors().get(0).startsWith("pod list of platform after the run failed"),
-                record.errors().get(0));
-        assertTrue(record.errors().get(1).startsWith("events of thesis failed"), record.errors().get(1));
-        assertEquals(4, record.cluster().podsBefore().size());
-        assertEquals(3, record.cluster().podsAfter().size());
+        RunRecord run = world.store.records.get(0);
+        assertEquals(2, run.errors().size());
+        assertTrue(run.errors().get(0).startsWith("pod list of platform after the run failed"),
+                run.errors().get(0));
+        assertTrue(run.errors().get(1).startsWith("events of thesis failed"), run.errors().get(1));
+        assertEquals(4, run.cluster().podsBefore().size());
+        assertEquals(3, run.cluster().podsAfter().size());
         assertEquals(List.of("event-of-platform"),
-                record.cluster().events().path("items").findValuesAsText("name"));
+                run.cluster().events().path("items").findValuesAsText("name"));
     }
 
     @Test

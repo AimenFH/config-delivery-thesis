@@ -35,7 +35,7 @@ class CampaignConfigTest {
     }
 
     @Test
-    void everyCampaignLoadsItsProtocolScenarioAndTheThreeApproaches() throws Exception {
+    void everyCampaignLoadsItsProtocolScenarioAndTheFourApproaches() throws Exception {
         for (String name : List.of("s1", "s2", "s3", "s1-smoke", "s2-smoke", "s3-smoke")) {
             CampaignConfig config = CampaignConfig.read(CAMPAIGNS.resolve(name + ".json"));
 
@@ -44,7 +44,7 @@ class CampaignConfigTest {
             assertEquals(config, loaded.config());
             assertEquals(Fixtures.protocol(), loaded.protocol());
             assertEquals(Scenario.read(Fixtures.ROOT.resolve(config.scenario())), loaded.scenario());
-            assertEquals(List.of("way-a", "way-b", "way-c"),
+            assertEquals(List.of("way-a", "way-b", "way-c", "way-d"),
                     loaded.approaches().stream().map(ApproachDescriptor::name).toList());
         }
     }

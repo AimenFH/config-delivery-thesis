@@ -57,7 +57,7 @@ class ProtocolTest {
         assertEquals(10000, protocol.bootstrapResamples());
         assertEquals(20261115L, protocol.bootstrapSeed());
         assertEquals(List.of("approaches/way-a/approach.json", "approaches/way-b/approach.json",
-                "approaches/way-c/approach.json"), protocol.approaches());
+                "approaches/way-c/approach.json", "approaches/way-d/approach.json"), protocol.approaches());
     }
 
     @Test

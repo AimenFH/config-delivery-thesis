@@ -22,7 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CampaignTest {
 
     private static final String DELETE = "$ kubectl -n thesis delete deployment probe-service --ignore-not-found --wait=true";
-    private static final Set<String> ALL = Set.of("way-a", "way-b", "way-c");
+    private static final List<String> NAMES = List.of("way-a", "way-b", "way-c", "way-d");
+    private static final Set<String> ALL = Set.copyOf(NAMES);
 
     @TempDir
     Path results;
@@ -35,13 +36,13 @@ class CampaignTest {
         int exitCode = world.campaign().run();
 
         assertEquals(0, exitCode);
-        assertEquals(6, world.store.records.size());
-        assertEquals(List.of(1, 1, 1, 2, 2, 2), world.store.records.stream().map(RunRecord::block).toList());
-        assertEquals(List.of(1, 2, 3, 1, 2, 3),
+        assertEquals(8, world.store.records.size());
+        assertEquals(List.of(1, 1, 1, 1, 2, 2, 2, 2), world.store.records.stream().map(RunRecord::block).toList());
+        assertEquals(List.of(1, 2, 3, 4, 1, 2, 3, 4),
                 world.store.records.stream().map(RunRecord::positionInBlock).toList());
-        assertEquals(List.of(1, 1, 1, 1, 1, 1), world.store.records.stream().map(RunRecord::attempt).toList());
-        assertEquals(ALL, approaches(world, 0, 3));
-        assertEquals(ALL, approaches(world, 3, 6));
+        assertEquals(List.of(1, 1, 1, 1, 1, 1, 1, 1), world.store.records.stream().map(RunRecord::attempt).toList());
+        assertEquals(ALL, approaches(world, 0, 4));
+        assertEquals(ALL, approaches(world, 4, 8));
     }
 
     @Test
@@ -50,9 +51,9 @@ class CampaignTest {
 
         world.campaign().run();
 
-        CampaignRecord record = campaignRecord();
-        assertEquals(3, record.blocks().size());
-        assertEquals(record.blocks().stream().flatMap(List::stream).toList(),
+        CampaignRecord written = campaignRecord();
+        assertEquals(3, written.blocks().size());
+        assertEquals(written.blocks().stream().flatMap(List::stream).toList(),
                 world.store.records.stream().map(RunRecord::approach).toList());
     }
 
@@ -64,7 +65,7 @@ class CampaignTest {
         first.campaign().run();
         second.campaign().run();
 
-        assertEquals(9, first.store.records.size());
+        assertEquals(12, first.store.records.size());
         assertEquals(first.store.records.stream().map(RunRecord::approach).toList(),
                 second.store.records.stream().map(RunRecord::approach).toList());
     }
@@ -72,12 +73,12 @@ class CampaignTest {
     @Test
     void an_invalid_run_is_repeated_at_once_with_the_same_approach() throws Exception {
         Fakes.World world = world("s1-valid-change", 1, 1, 3);
-        world.judge.verdict = record -> record.approach().equals("way-b") && record.attempt() == 1 ? INVALID : VALID;
+        world.judge.verdict = run -> run.approach().equals("way-b") && run.attempt() == 1 ? INVALID : VALID;
 
         int exitCode = world.campaign().run();
 
         assertEquals(0, exitCode);
-        assertEquals(4, world.store.records.size());
+        assertEquals(5, world.store.records.size());
         int first = indexOf(world, "way-b");
         assertEquals("way-b", world.store.records.get(first + 1).approach());
         assertEquals(1, world.store.records.get(first).attempt());
@@ -92,69 +93,70 @@ class CampaignTest {
     @Test
     void an_invalid_run_is_kept_and_saved() throws Exception {
         Fakes.World world = world("s1-valid-change", 1, 1, 3);
-        world.judge.verdict = record -> record.approach().equals("way-a") && record.attempt() == 1 ? INVALID : VALID;
+        world.judge.verdict = run -> run.approach().equals("way-a") && run.attempt() == 1 ? INVALID : VALID;
 
         world.campaign().run();
 
         assertEquals(1, world.store.metrics.stream().filter(metrics -> metrics.verdict() == INVALID).count());
-        assertEquals(4, new HashSet<>(world.store.records.stream().map(RunRecord::runId).toList()).size());
+        assertEquals(5, new HashSet<>(world.store.records.stream().map(RunRecord::runId).toList()).size());
     }
 
     @Test
     void an_invalid_run_is_repeated_at_most_twice_per_block_and_a_third_invalid_run_moves_on() throws Exception {
         Fakes.World world = world("s1-valid-change", 1, 1, 3);
-        world.judge.verdict = record -> record.approach().equals("way-b") ? INVALID : VALID;
+        world.judge.verdict = run -> run.approach().equals("way-b") ? INVALID : VALID;
 
         int exitCode = world.campaign().run();
 
         assertEquals(2, exitCode);
-        assertEquals(5, world.store.records.size());
+        assertEquals(6, world.store.records.size());
         int first = indexOf(world, "way-b");
         assertEquals(List.of("way-b", "way-b", "way-b"),
                 world.store.records.subList(first, first + 3).stream().map(RunRecord::approach).toList());
         assertEquals(List.of(1, 2, 3),
                 world.store.records.subList(first, first + 3).stream().map(RunRecord::attempt).toList());
-        assertEquals(3, world.store.records.stream().filter(record -> record.approach().equals("way-b")).count());
-        assertEquals(1, world.store.records.stream().filter(record -> record.approach().equals("way-a")).count());
-        assertEquals(1, world.store.records.stream().filter(record -> record.approach().equals("way-c")).count());
+        assertEquals(3, world.store.records.stream().filter(run -> run.approach().equals("way-b")).count());
+        assertEquals(1, world.store.records.stream().filter(run -> run.approach().equals("way-a")).count());
+        assertEquals(1, world.store.records.stream().filter(run -> run.approach().equals("way-c")).count());
+        assertEquals(1, world.store.records.stream().filter(run -> run.approach().equals("way-d")).count());
     }
 
     @Test
     void the_second_repetition_can_still_make_the_block_valid() throws Exception {
         Fakes.World world = world("s1-valid-change", 1, 1, 3);
-        world.judge.verdict = record -> record.approach().equals("way-c") && record.attempt() < 3 ? INVALID : VALID;
+        world.judge.verdict = run -> run.approach().equals("way-c") && run.attempt() < 3 ? INVALID : VALID;
 
         int exitCode = world.campaign().run();
 
         assertEquals(0, exitCode);
-        assertEquals(5, world.store.records.size());
+        assertEquals(6, world.store.records.size());
     }
 
     @Test
     void the_retries_start_again_in_every_block() throws Exception {
         Fakes.World world = world("s1-valid-change", 1, 2, 3);
-        world.judge.verdict = record -> record.approach().equals("way-b") ? INVALID : VALID;
+        world.judge.verdict = run -> run.approach().equals("way-b") ? INVALID : VALID;
 
         int exitCode = world.campaign().run();
 
         assertEquals(2, exitCode);
-        assertEquals(10, world.store.records.size());
+        assertEquals(12, world.store.records.size());
         assertEquals(List.of(1, 2, 3, 1, 2, 3), world.store.records.stream()
-                .filter(record -> record.approach().equals("way-b")).map(RunRecord::attempt).toList());
+                .filter(run -> run.approach().equals("way-b")).map(RunRecord::attempt).toList());
         assertEquals(List.of(1, 1, 1, 2, 2, 2), world.store.records.stream()
-                .filter(record -> record.approach().equals("way-b")).map(RunRecord::block).toList());
+                .filter(run -> run.approach().equals("way-b")).map(RunRecord::block).toList());
     }
 
     @Test
     void the_campaign_ends_with_2_when_an_approach_does_not_reach_its_valid_runs_within_the_blocks()
             throws Exception {
         Fakes.World world = world("s1-valid-change", 2, 2, 5);
-        world.judge.verdict = record -> record.approach().equals("way-a") && record.block() == 2 ? INVALID : VALID;
+        world.judge.verdict = run -> run.approach().equals("way-a") && run.block() == 2 ? INVALID : VALID;
 
         int exitCode = world.campaign().run();
 
         assertEquals(2, exitCode);
-        assertEquals(8, world.store.records.size());
+        assertEquals(10, world.store.records.size());
     }
 
     @Test
@@ -164,36 +166,36 @@ class CampaignTest {
         int exitCode = world.campaign().run();
 
         assertEquals(0, exitCode);
-        assertEquals(6, world.store.records.size());
+        assertEquals(8, world.store.records.size());
         assertEquals(25, campaignRecord().blocks().size());
     }
 
     @Test
     void a_block_contains_every_approach_also_one_that_already_reached_its_number() throws Exception {
         Fakes.World world = world("s1-valid-change", 1, 3, 9);
-        String firstOfSecondBlock = BlockPlan.draw(List.of("way-a", "way-b", "way-c"), 3, 9).get(1).get(0);
-        world.judge.verdict = record -> record.approach().equals(firstOfSecondBlock) && record.block() == 1
+        String firstOfSecondBlock = BlockPlan.draw(NAMES, 3, 9).get(1).get(0);
+        world.judge.verdict = run -> run.approach().equals(firstOfSecondBlock) && run.block() == 1
                 ? INVALID : VALID;
 
         int exitCode = world.campaign().run();
 
         assertEquals(0, exitCode);
-        assertEquals(8, world.store.records.size());
-        assertEquals(firstOfSecondBlock, world.store.records.get(5).approach());
-        assertEquals(ALL, approaches(world, 5, 8));
-        assertEquals(List.of(2, 2, 2), world.store.records.subList(5, 8).stream().map(RunRecord::block).toList());
+        assertEquals(10, world.store.records.size());
+        assertEquals(firstOfSecondBlock, world.store.records.get(6).approach());
+        assertEquals(ALL, approaches(world, 6, 10));
+        assertEquals(List.of(2, 2, 2, 2), world.store.records.subList(6, 10).stream().map(RunRecord::block).toList());
     }
 
     @Test
     void at_most_the_blocks_of_the_campaign_file_are_run() throws Exception {
         Fakes.World world = world("s1-valid-change", 3, 4, 5);
-        world.judge.verdict = record -> INVALID;
+        world.judge.verdict = run -> INVALID;
 
         int exitCode = world.campaign().run();
 
         assertEquals(2, exitCode);
-        assertEquals(36, world.store.records.size());
-        assertEquals(4, world.store.records.get(35).block());
+        assertEquals(48, world.store.records.size());
+        assertEquals(4, world.store.records.get(47).block());
     }
 
     @Test
@@ -209,24 +211,24 @@ class CampaignTest {
         world.campaign().run();
 
         assertEquals(List.of("approaches/way-a.json", "approaches/way-b.json", "approaches/way-c.json",
-                "campaign.json", "fingerprint.json"), seenAtFirstRun.get(0));
+                "approaches/way-d.json", "campaign.json", "fingerprint.json"), seenAtFirstRun.get(0));
         Path directory = campaignDirectory();
         assertTrue(directory.getFileName().toString().matches("\\d{8}-\\d{6}_test"), directory.toString());
         assertEquals(directory, world.store.directory);
-        CampaignRecord record = campaignRecord();
-        assertEquals(directory.getFileName().toString(), record.campaignId());
-        assertEquals(world.loaded.config(), record.config());
-        assertEquals(world.loaded.protocol(), record.protocol());
-        assertEquals(world.loaded.scenario(), record.scenario());
-        assertEquals(List.of("way-a", "way-b", "way-c"), record.approaches());
-        assertEquals(BlockPlan.draw(List.of("way-a", "way-b", "way-c"), 2, 20261115L), record.blocks());
+        CampaignRecord written = campaignRecord();
+        assertEquals(directory.getFileName().toString(), written.campaignId());
+        assertEquals(world.loaded.config(), written.config());
+        assertEquals(world.loaded.protocol(), written.protocol());
+        assertEquals(world.loaded.scenario(), written.scenario());
+        assertEquals(NAMES, written.approaches());
+        assertEquals(BlockPlan.draw(NAMES, 2, 20261115L), written.blocks());
         for (ApproachDescriptor descriptor : world.loaded.approaches()) {
             assertEquals(descriptor, ApproachDescriptor.read(
                     directory.resolve("approaches").resolve(descriptor.name() + ".json")));
         }
         assertEquals(3, Fixtures.JSON.readValue(directory.resolve("fingerprint.json").toFile(), Fingerprint.class)
                 .workloadImages().size());
-        assertEquals(record.campaignId(), world.store.records.get(0).campaign());
+        assertEquals(written.campaignId(), world.store.records.get(0).campaign());
     }
 
     @Test
@@ -257,13 +259,13 @@ class CampaignTest {
         assertEquals(1, world.log.stream().filter(DELETE::equals).count());
         assertFalse(world.log.stream().anyMatch(entry -> entry.endsWith(" deploy")));
         assertEquals(List.of("approaches/way-a.json", "approaches/way-b.json", "approaches/way-c.json",
-                "campaign.json", "fingerprint.json"), files(campaignDirectory()));
+                "approaches/way-d.json", "campaign.json", "fingerprint.json"), files(campaignDirectory()));
     }
 
     @Test
     void a_stop_in_a_later_run_keeps_the_runs_before_it() throws Exception {
         Fakes.World world = world("s1-valid-change", 1, 1, 4);
-        String third = BlockPlan.draw(List.of("way-a", "way-b", "way-c"), 1, 4).get(0).get(2);
+        String third = BlockPlan.draw(NAMES, 1, 4).get(0).get(2);
         world.adapters.get(third).resetExitCode = 1;
 
         int exitCode = world.campaign().run();
@@ -338,9 +340,9 @@ class CampaignTest {
         Fakes.World world = world("s2-invalid-config", 1, 1, 4);
 
         assertEquals(0, world.campaign().run());
-        assertEquals(3, world.log.stream().filter(
+        assertEquals(4, world.log.stream().filter(
                 "$ kubectl -n thesis set env deployment/probe-service CONFIG_GATE_ENABLED=true"::equals).count());
-        assertEquals(List.of(true, true, true), world.store.records.stream().map(RunRecord::gate).toList());
+        assertEquals(List.of(true, true, true, true), world.store.records.stream().map(RunRecord::gate).toList());
     }
 
     @Test
@@ -376,7 +378,7 @@ class CampaignTest {
     @Test
     void another_image_id_in_a_later_run_stops_the_campaign_with_1() throws Exception {
         Fakes.World world = world("s1-valid-change", 1, 1, 4);
-        world.judge.verdict = record -> {
+        world.judge.verdict = run -> {
             world.kubectl.pods.path("items").forEach(pod ->
                     ((ObjectNode) pod.path("status").path("containerStatuses").get(0)).put("imageID", "sha256:new"));
             return VALID;
@@ -392,7 +394,7 @@ class CampaignTest {
         Fakes.World world = world("s1-valid-change", 1, 1, 4);
 
         assertEquals(0, world.campaign().run());
-        assertEquals(3, world.store.records.size());
+        assertEquals(4, world.store.records.size());
     }
 
     @Test
@@ -413,7 +415,7 @@ class CampaignTest {
         world.probe.snapshots.add(Fakes.answers(60, Fakes.PODS, "v1", 250));
 
         assertEquals(0, world.campaign().run());
-        assertEquals(3, world.store.records.size());
+        assertEquals(4, world.store.records.size());
     }
 
     @Test
@@ -436,12 +438,12 @@ class CampaignTest {
     void a_failed_commit_does_not_stop_the_campaign() throws Exception {
         Fakes.World world = world("s1-valid-change", 1, 1, 4);
         world.adapters.values().forEach(adapter -> adapter.commitExitCode = payload -> 1);
-        world.judge.verdict = record -> record.t0() == null ? INVALID : VALID;
+        world.judge.verdict = run -> run.t0() == null ? INVALID : VALID;
 
         int exitCode = world.campaign().run();
 
         assertEquals(2, exitCode);
-        assertEquals(9, world.store.records.size());
+        assertEquals(12, world.store.records.size());
         assertFalse(world.log.stream().anyMatch(entry -> entry.contains(" trigger ")));
     }
 
@@ -461,11 +463,13 @@ class CampaignTest {
                 lastReady.add(i);
             }
         }
-        assertEquals(3, deletes.size());
-        assertEquals(4, lastReady.size());
+        assertEquals(4, deletes.size());
+        assertEquals(7, lastReady.size());
         assertTrue(world.log.subList(deletes.get(0), deletes.get(1)).stream()
                 .anyMatch(entry -> entry.startsWith("$ kubectl -n platform rollout status deployment/")));
         assertTrue(world.log.subList(deletes.get(1), deletes.get(2)).stream()
+                .anyMatch(entry -> entry.startsWith("$ kubectl -n platform rollout status deployment/")));
+        assertTrue(world.log.subList(deletes.get(2), deletes.get(3)).stream()
                 .anyMatch(entry -> entry.startsWith("$ kubectl -n platform rollout status deployment/")));
         assertTrue(world.kubectl.replicas.values().stream().allMatch(replicas -> replicas == 1));
     }
@@ -477,7 +481,7 @@ class CampaignTest {
 
         assertEquals(0, world.campaign().run());
 
-        assertEquals(3, world.store.records.size());
+        assertEquals(4, world.store.records.size());
         List<String> run = world.logFrom(DELETE);
         int invariants = run.indexOf("$ kubectl -n thesis get pods -l app=probe-service -o json");
         assertEquals(List.of(
@@ -485,7 +489,10 @@ class CampaignTest {
                 "$ kubectl -n platform get deployment config-watcher -o json",
                 "$ kubectl -n platform get deployment config-server -o json",
                 "$ kubectl -n platform get deployment rabbitmq -o json",
-                "probe 60"), run.subList(invariants + 1, invariants + 6));
+                "$ kubectl -n platform get deployment argocd-application-controller -o json",
+                "$ kubectl -n platform get deployment argocd-repo-server -o json",
+                "$ kubectl -n platform get deployment argocd-redis -o json",
+                "probe 60"), run.subList(invariants + 1, invariants + 9));
         assertTrue(invariants < run.indexOf("load start"));
     }
 
@@ -493,7 +500,7 @@ class CampaignTest {
     void an_infrastructure_deployment_of_another_approach_at_0_replicas_stops_the_campaign_before_the_load()
             throws Exception {
         Fakes.World world = world("s1-valid-change", 1, 1, 4);
-        String first = BlockPlan.draw(List.of("way-a", "way-b", "way-c"), 1, 4).get(0).get(0);
+        String first = BlockPlan.draw(NAMES, 1, 4).get(0).get(0);
         String down = first.equals("way-b") ? "reloader-reloader" : "config-watcher";
         world.kubectl.replicas.put("platform/" + down, 0);
 
@@ -539,26 +546,26 @@ class CampaignTest {
     void an_evaluation_that_throws_still_saves_the_raw_run_as_invalid_and_stops_the_campaign_with_1()
             throws Exception {
         Fakes.World world = world("s1-valid-change", 1, 1, 4);
-        world.judge.verdict = record -> {
+        world.judge.verdict = run -> {
             throw new IllegalStateException("thrown in the test: evaluate");
         };
 
         assertEquals(1, world.campaign().run());
 
         assertEquals(1, world.store.records.size());
-        RunRecord record = world.store.records.get(0);
-        assertEquals(world.judge.records.get(0), record);
-        assertEquals(world.probe.loadObservations, record.observations());
+        RunRecord run = world.store.records.get(0);
+        assertEquals(world.judge.records.get(0), run);
+        assertEquals(world.probe.loadObservations, run.observations());
         RunMetrics metrics = world.store.metrics.get(0);
-        assertEquals(record.runId(), metrics.runId());
-        assertEquals(record.approach(), metrics.approach());
+        assertEquals(run.runId(), metrics.runId());
+        assertEquals(run.approach(), metrics.approach());
         assertEquals(INVALID, metrics.verdict());
         assertEquals(List.of("the evaluation failed: java.lang.IllegalStateException: thrown in the test: evaluate"),
                 metrics.invalidReasons());
         assertEquals(Set.of(), metrics.flags());
         assertEquals(List.of(), metrics.metrics());
         assertEquals(1, world.log.stream().filter(DELETE::equals).count());
-        assertEquals("store " + record.approach(), world.log.get(world.log.size() - 1));
+        assertEquals("store " + run.approach(), world.log.get(world.log.size() - 1));
     }
 
     @Test
@@ -571,17 +578,17 @@ class CampaignTest {
 
         assertEquals(1, world.store.records.size());
         assertEquals(1, world.judge.records.size());
-        RunRecord record = world.store.records.get(0);
+        RunRecord run = world.store.records.get(0);
         assertEquals(List.of(Scenario.Action.INFRA_DOWN, Scenario.Action.COMMIT, Scenario.Action.DELETE_POD,
-                Scenario.Action.INFRA_UP), record.steps().stream().map(RunRecord.StepRecord::action).toList());
-        assertEquals(List.of(0, 0, 0, 0), record.steps().stream().map(RunRecord.StepRecord::exitCode).toList());
-        assertEquals(360_000, record.runEndAt());
-        assertEquals(world.probe.loadObservations, record.observations());
+                Scenario.Action.INFRA_UP), run.steps().stream().map(RunRecord.StepRecord::action).toList());
+        assertEquals(List.of(0, 0, 0, 0), run.steps().stream().map(RunRecord.StepRecord::exitCode).toList());
+        assertEquals(360_000, run.runEndAt());
+        assertEquals(world.probe.loadObservations, run.observations());
         assertEquals(VALID, world.store.metrics.get(0).verdict());
         assertEquals(1, world.log.stream().filter("load stop"::equals).count());
-        assertTrue(world.log.indexOf("load stop") < world.log.indexOf("judge " + record.approach()));
+        assertTrue(world.log.indexOf("load stop") < world.log.indexOf("judge " + run.approach()));
         assertEquals(1, world.log.stream().filter(DELETE::equals).count());
-        assertEquals("store " + record.approach(), world.log.get(world.log.size() - 1));
+        assertEquals("store " + run.approach(), world.log.get(world.log.size() - 1));
     }
 
     private Fakes.World world(String scenario, int validRuns, int maxBlocks, long seed) throws IOException {

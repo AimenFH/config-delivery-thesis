@@ -166,7 +166,7 @@ and no campaign can override it.
 | `unsentLimitRatio` | 0.01 | Instrument check: share of scheduled requests without an observation |
 | `resourceGapLimitSeconds` | 15 | Instrument check: longest gap between resource samples of a node |
 | `bootstrapResamples`, `bootstrapSeed` | 10000, 20261115 | Bootstrap interval of the median in `summary.csv` |
-| `approaches` | three paths | The approach descriptors, in the order used for the block draw |
+| `approaches` | four paths | The approach descriptors, in the order used for the block draw |
 | `workload` | object | Fixed fields that `InvariantCheck` compares with the live objects |
 
 The `workload` block: image `probe-service:0.2.0`, container `probe`, requests
@@ -270,6 +270,16 @@ as `reset` and `commit` and have no `trigger`. Way C uses
 `~/config-repo`), makes one commit when the file changed, and pushes. The old
 script `tools/way-c-change.sh` no longer exists. Its refresh call is now the
 `trigger` of the descriptor.
+
+Way D uses two scripts. `tools/way-d-commit.sh <version> <timeoutMs>` edits both
+values in `probe-service/values.yaml` on the branch `way-d` of the configuration
+repository (`$CONFIG_REPO_WAY_D`, default `~/config-repo-way-d`), makes one commit
+when the file changed, and pushes. It stops when the folder is on another branch.
+`tools/way-d-reset.sh <version> <timeoutMs>` is the `reset`: it calls the commit
+script, deletes the Argo CD Application `way-d`, applies it again and waits until
+Argo CD has synced the pushed commit and the Deployment exists. The `trigger` is
+one `kubectl annotate` that tells Argo CD to look at Git. Steps by hand are in the
+[Way D runbook](runbook-way-d.md).
 
 ## What a campaign does
 

@@ -32,7 +32,8 @@
   "approaches": [
     "approaches/way-a/approach.json",
     "approaches/way-b/approach.json",
-    "approaches/way-c/approach.json"
+    "approaches/way-c/approach.json",
+    "approaches/way-d/approach.json"
   ],
   "workload": {
     "image": "probe-service:0.2.0",

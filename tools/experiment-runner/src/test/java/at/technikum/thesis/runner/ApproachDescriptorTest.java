@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.lang.reflect.RecordComponent;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -22,6 +23,7 @@ class ApproachDescriptorTest {
     private static final Path WAY_A = Fixtures.ROOT.resolve("approaches/way-a/approach.json");
     private static final Path WAY_B = Fixtures.ROOT.resolve("approaches/way-b/approach.json");
     private static final Path WAY_C = Fixtures.ROOT.resolve("approaches/way-c/approach.json");
+    private static final Path WAY_D = Fixtures.ROOT.resolve("approaches/way-d/approach.json");
 
     @Test
     void wayAPatchesBothKeysOfItsConfigMapInOneCall() throws Exception {
@@ -85,19 +87,43 @@ class ApproachDescriptorTest {
     }
 
     @Test
+    void wayDDeliversThroughGitWithItsOwnResetScript() throws Exception {
+        ApproachDescriptor descriptor = ApproachDescriptor.read(WAY_D);
+
+        assertEquals("way-d", descriptor.name());
+        assertEquals("GitOps with Argo CD and Helm", descriptor.title());
+        assertEquals(List.of("deploy/way-d-gitops"), descriptor.manifests());
+        assertEquals(List.of("bash", "tools/way-d-reset.sh", "{initialVersion}", "{initialTimeoutMs}"),
+                descriptor.reset());
+        assertEquals(List.of("bash", "tools/way-d-commit.sh", "{version}", "{timeoutMs}"), descriptor.commit());
+        assertEquals(List.of("kubectl", "-n", "platform", "annotate", "application", "way-d",
+                "argocd.argoproj.io/refresh=normal", "--overwrite"), descriptor.trigger());
+        assertEquals(List.of("bash", "-c", "git -C \"${CONFIG_REPO_WAY_D:-$HOME/config-repo-way-d}\" "
+                + "ls-remote -q --exit-code origin refs/heads/way-d"), descriptor.sourceCheck());
+        assertEquals(List.of(new ApproachDescriptor.Infrastructure("platform", "argocd-application-controller"),
+                new ApproachDescriptor.Infrastructure("platform", "argocd-repo-server"),
+                new ApproachDescriptor.Infrastructure("platform", "argocd-redis")), descriptor.infrastructure());
+        assertEquals(new ApproachDescriptor.Declared(List.of("Argo CD application controller",
+                "Argo CD repo server", "Redis"), 2, true, "none, values read at process start"),
+                descriptor.declared());
+    }
+
+    @Test
     void theManifestFoldersAndTheCommitScriptExist() throws Exception {
-        for (Path file : List.of(WAY_A, WAY_B, WAY_C)) {
+        for (Path file : List.of(WAY_A, WAY_B, WAY_C, WAY_D)) {
             for (String manifests : ApproachDescriptor.read(file).manifests()) {
                 assertEquals(true, Files.isDirectory(Fixtures.ROOT.resolve(manifests)), manifests);
             }
         }
         assertEquals(true, Files.isRegularFile(Fixtures.ROOT.resolve(ApproachDescriptor.read(WAY_C).commit().get(1))));
+        assertEquals(true, Files.isRegularFile(Fixtures.ROOT.resolve(ApproachDescriptor.read(WAY_D).commit().get(1))));
+        assertEquals(true, Files.isRegularFile(Fixtures.ROOT.resolve(ApproachDescriptor.read(WAY_D).reset().get(1))));
     }
 
     @Test
     void theSchemaHasNoPlaceForTimingRateReplicasOrValidity() {
         Set<String> fields = Arrays.stream(ApproachDescriptor.class.getRecordComponents())
-                .map(component -> component.getName()).collect(Collectors.toSet());
+                .map(RecordComponent::getName).collect(Collectors.toSet());
 
         assertEquals(Set.of("name", "title", "manifests", "reset", "commit", "trigger", "sourceCheck",
                 "infrastructure", "declared"), fields);

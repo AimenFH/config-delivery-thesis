@@ -1117,6 +1117,130 @@ machine.
 
 ---
 
+## 2026-11-21: Way D delivers through Argo CD and a Helm chart in Git
+
+**Problem.** The three approaches so far change a ConfigMap or call a refresh
+endpoint. Many teams do neither by hand. They commit to Git and a GitOps
+controller makes the cluster follow. I want a fourth approach that is built the
+way such a team would build it, so that its numbers say something about that
+practice.
+
+**Rejected.** Plain manifests in Git without Helm, which works. I chose Helm
+because I want the setup close to what a team would run. A ConfigMap in Git with
+Reloader for the
+restart, which is Way A with another source and would measure Reloader a second
+time. It stays the fallback in case the Helm design breaks a fixed field. The
+full Argo CD install with API server, web page, Dex and notifications, which
+adds four components that no step of a run uses. A namespace `argocd`, because
+the delivery components of every approach live in `platform`.
+
+**Chosen.** Argo CD 3.5.8 with three components in `platform`: application
+controller, repo server and Redis. `deploy/platform/argocd/kustomization.yaml`
+takes them from the official repository and is applied with
+`kubectl apply --server-side -k`. The Helm chart of probe-service is on the
+branch `way-d` of the configuration repository, in the folder `probe-service`.
+A copy is in `deploy/way-d-gitops/chart/`. The chart renders the ConfigMap
+`demo-config-gitops`, the Deployment and the Service. The Deployment is the one
+of Way A with the same fixed fields, without the Reloader annotation, and with
+the annotation `checksum/config` on the pod template. That annotation is the
+hash of the rendered ConfigMap, so a new value in `values.yaml` changes the pod
+template and Kubernetes starts a rolling restart. A configuration change is one
+commit that edits `values.yaml`.
+
+**Cost.** The application controller runs as a Deployment. The official install
+uses a StatefulSet. I changed it because the runner scales and reads
+Deployments only. The chart exists in two places, the configuration repository
+and this repository, and nothing checks that they are the same. Argo CD has
+cluster-wide read rights. After the sync the delivery is a rolling restart, so
+Way D shares the inconsistency window of Way A and differs only in the time
+before the restart starts and in the components it needs. Every Way D number
+contains a round trip to GitHub, as for Way C. No pilot runs were made for a
+tuning rule. The values are the defaults of Argo CD and the rollout settings of
+Way A.
+
+---
+
+## 2026-11-21: Argo CD syncs without self-heal and reads its own branch
+
+**Problem.** There is one test system for all approaches. Argo CD keeps running
+while Way A, B and C are measured, and their runs delete and create the same
+Deployment `probe-service` that Argo CD manages for Way D. The runner also sets
+`CONFIG_GATE_ENABLED` on that Deployment with `kubectl set env`, for every
+approach in the same way. Argo CD must not undo either.
+
+**Rejected.** `selfHeal: true`, which makes Argo CD correct every difference
+it sees. It would put the Deployment of the chart back during a run of another
+approach. Removing
+the Application after every Way D run, which needs a step in the core that only
+one approach uses. A second Deployment name for Way D, because the protocol
+fixes the name for all approaches. The branch `main` for the chart, because
+every Way C commit would then be a new revision for Argo CD.
+
+**Chosen.** The Application has `automated` sync with `selfHeal: false` and
+`prune: false`. Argo CD then acts once per new commit and leaves later changes
+in the cluster alone. It reads the branch `way-d`, which only Way D commits to.
+The AppProject `thesis` allows one repository, the namespace `thesis` and the
+kinds ConfigMap, Service and Deployment. I checked both conditions by hand on
+2026-11-21. After a sync of a new commit the Deployment still had
+`CONFIG_GATE_ENABLED=false`, and Argo CD showed `Synced` with the variable on.
+With Way A deployed, Argo CD showed `OutOfSync` for four minutes and after one
+forced refresh, started no sync, and the Way A pods were the same at the end.
+
+**Cost.** Correcting drift is one of the reasons to use GitOps, and it is off
+here, so the experiment says nothing about it. Argo CD shows `OutOfSync`
+whenever another approach is deployed, which looks like an error and is none.
+Argo CD compares the cluster with Git every few minutes during every run of
+every approach. The period is the default of Argo CD, I did not set it. This
+load is the same for all, but the numbers of the campaigns before 2026-11-21
+were measured without it. The three Argo CD containers have no CPU or memory
+requests. `kubectl apply` of Way A
+now answers `service/probe-service configured`. Type, ports and selector are
+unchanged, and I have not confirmed which field differs.
+
+---
+
+## 2026-11-21: Way D's trigger is a refresh annotation and its reset creates the Application again
+
+**Problem.** Argo CD looks at Git every few minutes. In practice a
+webhook from GitHub tells it about a commit at once. GitHub cannot reach a kind
+cluster on my machine, and the install has no API server that could receive a
+webhook. The second problem is the start of a run. The runner deletes the
+Deployment and expects the approach to bring three replicas at v1 back. Without
+self-heal Argo CD does not create a deleted Deployment again when the commit is
+the same as before.
+
+**Rejected.** For the trigger: waiting for the poll, which would measure a
+timer of some minutes that a team with a webhook does not have. A
+reconciliation period of a few seconds, which no one runs and which loads the
+cluster. The Argo CD API server behind a tunnel, a new component and a service
+on the internet only for this. For the reset: writing a sync operation into the
+Application, which can meet a sync that Argo CD has just started by itself.
+
+**Chosen.** The `trigger` of the descriptor is
+`kubectl -n platform annotate application way-d argocd.argoproj.io/refresh=normal --overwrite`.
+It does what the webhook does: it tells the controller to look at Git now.
+`operatorActionsPerChange` is 2, commit and trigger, as for Way C. The `reset`
+is `tools/way-d-reset.sh`. It pushes v1 with `tools/way-d-commit.sh`, deletes
+the Application, applies `deploy/way-d-gitops/application.yaml` again and waits
+until the Application is `Synced` at the pushed commit, the Deployment exists
+and the ConfigMap holds v1. A new Application has no sync history, so Argo CD
+syncs it once. The Application has no finalizer, so deleting it leaves the
+objects in `thesis`. The `manifests` entry `deploy/way-d-gitops` applies the
+same Application file, which changes nothing after the reset.
+
+**Cost.** With a webhook a change is one operator action. Here it counts two.
+The trigger writes to the Kubernetes API and succeeds while Argo CD is scaled
+to 0, so in S3 I expect no `TRIGGER_FAILED` and a delivery after `infraUp`.
+That is not tested. The reset holds logic that the core has for no other
+approach, and it needs GitHub, so a run cannot start when GitHub is not
+reachable. The sync history of the Application is lost at every run. The first
+creation of the pods is done by Argo CD inside `reset`, not by the `deploy`
+step of the runner. Way D was added to `protocol/protocol-v1.json` while
+`protocolVersion` is still 1. Whether the number changes is open, see journal
+entries 08 and 10.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>

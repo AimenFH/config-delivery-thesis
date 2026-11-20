@@ -12,6 +12,11 @@ campaigns `campaigns/s1.json`, `campaigns/s2.json` and `campaigns/s3.json` have
 not been run. They wait for the open points in
 [journal entry 06](journal/06-experiment-protocol.md#open-points).
 
+State on 2026-11-21: the protocol file names a fourth approach, Way D. No
+campaign has run with it. The outputs and times in this runbook are from
+campaigns with three approaches. See
+[journal entry 10](journal/10-way-d-argo-cd-and-helm.md).
+
 Reference: [experiment runner](runner.md) for arguments and file formats,
 [plan](../docs/experiment-plan.md) for the specification.
 
@@ -24,6 +29,7 @@ Reference: [experiment runner](runner.md) for arguments and file formats,
 | `kubectl`, Java 21 or newer, Maven, `git`, `bash` | `kubectl version --client`, `java -version`, `mvn -v` |
 | Port 30080 free for the cluster's NodePort | `curl -s localhost:30080/probe` answers when a Way is deployed |
 | A clone of the configuration repository with push access to GitHub | `git -C ~/config-repo ls-remote -q origin HEAD` prints a commit hash without asking for a password |
+| The branch `way-d` of that repository in its own folder | `git -C ~/config-repo-way-d rev-parse --abbrev-ref HEAD` prints `way-d`. See the [Way D runbook](runbook-way-d.md#2-put-the-chart-on-the-branch-way-d-once) |
 | A quiet machine: plugged in, no builds, no other heavy work | |
 
 All commands run from the repository root. The cluster setup itself is in the
@@ -70,17 +76,20 @@ changes between two of its runs.
 kubectl -n platform get deployments
 ```
 
-Expected result: four Deployments, each with `1/1` ready:
+Expected result: seven Deployments, each with `1/1` ready:
 
 ```
-NAME                READY   UP-TO-DATE   AVAILABLE
-config-server       1/1     1            1
-config-watcher      1/1     1            1
-rabbitmq            1/1     1            1
-reloader-reloader   1/1     1            1
+NAME                            READY   UP-TO-DATE   AVAILABLE
+argocd-application-controller   1/1     1            1
+argocd-redis                    1/1     1            1
+argocd-repo-server              1/1     1            1
+config-server                   1/1     1            1
+config-watcher                  1/1     1            1
+rabbitmq                        1/1     1            1
+reloader-reloader               1/1     1            1
 ```
 
-All four must be up for every campaign, also when you think only one approach
+All seven must be up for every campaign, also when you think only one approach
 matters. The runner checks them before every run.
 
 ### 4. The configuration repository is clean
@@ -101,6 +110,20 @@ Expected result: two lines. If the repository is somewhere else, set
 
 Way C pushes two or three commits to GitHub in every run: the reset to v1 and one
 per commit step. That is expected.
+
+Way D has its own folder and its own file. The same two checks:
+
+```bash
+git -C ~/config-repo-way-d status --short
+```
+
+```bash
+grep -n "^  configVersion: \|^  timeoutMs: " ~/config-repo-way-d/probe-service/values.yaml
+```
+
+Expected result: no output from the first command and two lines from the second.
+If the folder is somewhere else, set `CONFIG_REPO_WAY_D`. Way D pushes its commits
+to the branch `way-d`, also two or three in every run.
 
 ### 5. Nothing else is measuring
 
@@ -225,20 +248,22 @@ caffeinate -dims java -jar tools/experiment-runner/target/experiment-runner.jar 
 
 | Campaign | Valid runs per approach | Blocks at most | Time planned |
 |---|---|---|---|
-| `s1` | 20 | 25 | about 6.7 hours for 20 blocks |
-| `s2` | 10 | 25 | about 4.3 hours for 10 blocks |
-| `s3` | 10 | 25 | about 4.3 hours for 10 blocks |
+| `s1` | 20 | 25 | about 8.9 hours for 20 blocks |
+| `s2` | 10 | 25 | about 5.8 hours for 10 blocks |
+| `s3` | 10 | 25 | about 5.8 hours for 10 blocks |
 
-The times are those of the plan (6.7 minutes per S1 run, 8.7 minutes per S2 or S3
-run) and grow with every repeated run. The plan asks for 3 pilot blocks per
+The times are the run times of the plan (6.7 minutes per S1 run, 8.7 minutes per
+S2 or S3 run) for four approaches, and grow with every repeated run. With three
+approaches the plan had 6.7 and 4.3 hours. The plan asks for 3 pilot blocks per
 scenario before each campaign. They are not part of the results.
 
 The output has the same form as that of a smoke campaign. The full campaigns use
 the same seed as the smoke campaigns, so their first blocks have the same order:
-block 1 is `[way-a, way-b, way-c]`, block 2 is `[way-b, way-a, way-c]`.
+block 1 is `[way-d, way-b, way-a, way-c]`, block 2 is `[way-d, way-c, way-b, way-a]`.
+With three approaches they were `[way-a, way-b, way-c]` and `[way-b, way-a, way-c]`.
 
 The campaign ends before the last block when every approach has reached its valid
-runs. Every block that is started runs all three approaches, so an approach can
+runs. Every block that is started runs all four approaches, so an approach can
 end with more valid runs than asked.
 
 ## After a campaign
@@ -250,7 +275,7 @@ end with more valid runs than asked.
    kubectl -n platform get deployments
    ```
 
-   Expected result: the four Deployments with `1/1`, as before the campaign.
+   Expected result: the seven Deployments with `1/1`, as before the campaign.
 
 3. Look at the verdicts and flags:
 
@@ -327,7 +352,13 @@ No class in `tools/experiment-runner/` changes in these steps.
 
 Step 4 changes the protocol file. The plan's list for adding an approach does not
 name this step, and the plan says that a change of the protocol needs a new
-protocol version. Decide this before the first approach is added.
+protocol version. Way D was added on 2026-11-21 with `protocolVersion` still 1.
+The decision is open, see
+[journal entry 10](journal/10-way-d-argo-cd-and-helm.md#open-points).
+
+Way D does not follow step 1 to the letter. Its folder `deploy/way-d-gitops/`
+holds the Argo CD Application, and the Deployment and the Service come from a
+Helm chart in Git. Steps 6 and 7 are not done for Way D.
 
 If the new approach needs a library inside probe-service, the image changes for
 every approach and all approaches are measured again on the new image.
@@ -387,13 +418,14 @@ Other cases:
 
 ## Rollback
 
-A campaign changes three things outside its result folder.
+A campaign changes four things outside its result folder.
 
 | What | State after a campaign | How to reset |
 |---|---|---|
 | Namespace `thesis` | The Deployment of the approach that ran last, at the last version of the scenario | `kubectl -n thesis delete deployment probe-service`, or deploy the Way you need |
 | Infrastructure in `platform` | Back at the earlier replica counts, unless the restore failed | `kubectl -n platform scale deployment/<name> --replicas=1` |
-| Configuration repository on GitHub | At the last version Way C committed | `bash tools/way-c-commit.sh v1 1000` |
+| Configuration repository on GitHub, branch `main` | At the last version Way C committed | `bash tools/way-c-commit.sh v1 1000` |
+| Configuration repository on GitHub, branch `way-d` | At the last version Way D committed | `bash tools/way-d-reset.sh v1 1000` |
 
 If something in the results looks wrong and the cause is not in this runbook,
 keep the campaign folder as it is and write down what you saw before changing

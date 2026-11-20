@@ -51,7 +51,7 @@ class RunnerTest {
         Path dir = folder.get();
         List<String> runIds = new ResultWriter(dir).runIds();
         assertEquals(2, exitCode);
-        assertEquals(3 * 3, runIds.size());
+        assertEquals(4 * 3, runIds.size());
         for (String runId : runIds) {
             for (String suffix : List.of(".ndjson", ".resources.ndjson", ".cluster.json", ".meta.json")) {
                 assertTrue(Files.isRegularFile(dir.resolve(runId + suffix)), runId + suffix);
@@ -67,9 +67,9 @@ class RunnerTest {
         byte[] summary = Files.readAllBytes(dir.resolve("summary.csv"));
         List<String> runLines = Files.readAllLines(dir.resolve("runs.csv"));
         List<String> summaryLines = Files.readAllLines(dir.resolve("summary.csv"));
-        assertEquals(1 + 9, runLines.size());
-        assertEquals(runIds, runLines.subList(1, 10).stream().map(line -> line.split(",")[1]).toList());
-        for (String line : runLines.subList(1, 10)) {
+        assertEquals(1 + 12, runLines.size());
+        assertEquals(runIds, runLines.subList(1, 13).stream().map(line -> line.split(",")[1]).toList());
+        for (String line : runLines.subList(1, 13)) {
             assertTrue(line.startsWith("1,"), line);
             assertTrue(line.contains(",INVALID,resource sampling: node thesis-worker has no sample within 15 s of "
                     + "the start of the measured run; resource sampling: node thesis-worker has no sample within "
@@ -77,8 +77,8 @@ class RunnerTest {
                     + "the pod list and has no sample; resource sampling: node thesis-worker3 runs pods of the "
                     + "pod list and has no sample,,4882,4882,120,0,"), line);
         }
-        assertEquals(1 + 3 * 11 + 3 * 32 + 7 * 3 + 3 * 2, summaryLines.size());
-        for (String approach : List.of("way-a", "way-b", "way-c")) {
+        assertEquals(1 + 4 * 11 + 4 * 32 + 7 * 6 + 4 * 2, summaryLines.size());
+        for (String approach : List.of("way-a", "way-b", "way-c", "way-d")) {
             assertTrue(summaryLines.contains("1,count," + approach + ",,runs,3,,,,,,,,,,"), summaryLines.toString());
             assertTrue(summaryLines.contains("1,count," + approach + ",,valid,0,,,,,,,,,,"));
             assertTrue(summaryLines.contains("1,count," + approach + ",,invalid,3,,,,,,,,,,"));

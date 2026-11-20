@@ -64,7 +64,8 @@ flowchart LR
 | Way A manifests | `deploy/way-a-envvar/` | ConfigMap, Deployment with three replicas, NodePort Service. |
 | Way B manifests | `deploy/way-b-volume/` | Same service, configuration mounted as files, ConfigMap labelled for the Watcher. |
 | Way C manifests | `deploy/way-c-configserver/` | Same service, configuration fetched from the Config Server, Bus enabled. |
-| Platform | `deploy/platform/`, `deploy/reloader/` | Namespace `platform` with the delivery components of all approaches: Reloader (Way A), the Configuration Watcher (Way B), Config Server and RabbitMQ (Way C). Installed once. All of them run during every run. |
+| Way D manifests | `deploy/way-d-gitops/` | The Argo CD Application and its project. The folder `chart/` is a copy of the Helm chart of the same service. Argo CD reads the chart from the branch `way-d` of the configuration repository. |
+| Platform | `deploy/platform/`, `deploy/reloader/` | Namespace `platform` with the delivery components of all approaches: Reloader (Way A), the Configuration Watcher (Way B), Config Server and RabbitMQ (Way C), Argo CD (Way D, `deploy/platform/argocd/`). Installed once. All of them run during every run. |
 | Config Server | `services/config-server/` | Spring Cloud Config Server that reads a Git repository on GitHub. |
 | Monitoring | `deploy/monitoring/` | Namespace `monitoring` with Loki, Alloy and Grafana on the control-plane node. Keeps the pod logs and shows loaded results. It is not part of what is measured. See the [monitoring runbook](runbook-monitoring.md). |
 | Experiment runner | `tools/experiment-runner/` | Measurement instrument and fixed core: campaigns, load, resource sampling, evaluation. See [Experiment runner](runner.md). |
@@ -95,12 +96,13 @@ flowchart TB
         a["way-a<br/>environment variables, rolling restart"]
         b["way-b<br/>mounted files, refresh"]
         c["way-c<br/>Config Server on GitHub, Bus refresh"]
+        d["way-d<br/>Helm chart on GitHub, Argo CD, rolling restart"]
         n["next approach"]
     end
 
     subgraph cluster["kind cluster"]
         svc["Service and 3 probe-service replicas<br/>image 0.2.0, readiness gate switch"]
-        infra["platform namespace<br/>Reloader, Watcher, Config Server, RabbitMQ"]
+        infra["platform namespace<br/>Reloader, Watcher, Config Server, RabbitMQ, Argo CD"]
     end
 
     protocol --> campaign
@@ -112,6 +114,7 @@ flowchart TB
     adapter --> a
     adapter --> b
     adapter --> c
+    adapter --> d
     adapter --> n
     approaches -. "kubectl, git" .-> cluster
     campaign --> load
@@ -140,19 +143,25 @@ file.
 | `infrastructure` | Namespace and Deployment of each delivery component | Used for overhead and for the outage scenario |
 | `declared` | Extra components, operator actions per change, RBAC scope, coupling | Reported as declared (O5) |
 
-How the three approaches fill the contract:
+How the four approaches fill the contract:
 
-| | Way A | Way B | Way C |
-|---|---|---|---|
-| Descriptor | `approaches/way-a/approach.json` | `approaches/way-b/approach.json` | `approaches/way-c/approach.json` |
-| `manifests` | `deploy/way-a-envvar` | `deploy/way-b-volume` | `deploy/way-c-configserver` |
-| `commit` | `kubectl patch` of `configVersion` and `timeoutMs` in `demo-config` | `kubectl patch` of `demo.configVersion` and `demo.timeoutMs` in `demo-config` | `tools/way-c-commit.sh`: one Git commit, pushed to GitHub |
-| `trigger` | none | none | `POST /actuator/busrefresh` inside the Config Server pod |
-| `sourceCheck` | none | none | `git ls-remote` |
-| `infrastructure` | `platform/reloader-reloader` | `platform/config-watcher` | `platform/config-server`, `platform/rabbitmq` |
+| | Way A | Way B | Way C | Way D |
+|---|---|---|---|---|
+| Descriptor | `approaches/way-a/approach.json` | `approaches/way-b/approach.json` | `approaches/way-c/approach.json` | `approaches/way-d/approach.json` |
+| `manifests` | `deploy/way-a-envvar` | `deploy/way-b-volume` | `deploy/way-c-configserver` | `deploy/way-d-gitops`, the Argo CD Application |
+| `reset` | The `kubectl patch` of `commit` with v1 | The `kubectl patch` of `commit` with v1 | The commit script with v1 | `tools/way-d-reset.sh`: commit of v1, Application created again, wait for the sync |
+| `commit` | `kubectl patch` of `configVersion` and `timeoutMs` in `demo-config` | `kubectl patch` of `demo.configVersion` and `demo.timeoutMs` in `demo-config` | `tools/way-c-commit.sh`: one Git commit, pushed to GitHub | `tools/way-d-commit.sh`: one Git commit to `values.yaml`, pushed to the branch `way-d` |
+| `trigger` | none | none | `POST /actuator/busrefresh` inside the Config Server pod | `kubectl annotate` of the Application with a refresh request |
+| `sourceCheck` | none | none | `git ls-remote` | `git ls-remote` |
+| `infrastructure` | `platform/reloader-reloader` | `platform/config-watcher` | `platform/config-server`, `platform/rabbitmq` | `platform/argocd-application-controller`, `platform/argocd-repo-server`, `platform/argocd-redis` |
 
 The descriptor has no field for rate, replicas, durations, repetitions or validity
 rules, so an approach has no place to change the measurement.
+
+Way D is the one approach where `deploy` does not create the pods. Argo CD creates
+them from Git during `reset`, and `deploy` applies the Application file, which is
+then unchanged. The fixed fields are checked on the live Deployment as for every
+approach.
 
 ### What the core checks before every run
 
@@ -251,20 +260,20 @@ metric is in the [code walkthrough](code-walkthrough.md#the-metrics). What the
 approaches did in the smoke runs is in
 [journal entry 06](journal/06-experiment-protocol.md).
 
-## The three configuration paths
+## The four configuration paths
 
 The service is identical in every approach. What changes is how configuration
 reaches the running process and what makes it take effect.
 
-| | Way A | Way B | Way C |
-|---|---|---|---|
-| Source | ConfigMap | ConfigMap | Git repository via Config Server |
-| Enters the pod as | Environment variables | Files in `/etc/config/` | HTTP fetch from the Config Server |
-| Read by Spring | Once, at process start | On every refresh (`configtree:`) | On every refresh (`configserver:`) |
-| Activation | Rolling restart, started by Reloader | Configuration Watcher calls `/actuator/refresh` after `refreshDelay` | `POST /actuator/busrefresh` on the Config Server, sent to every replica over RabbitMQ |
-| Pod restarted? | Yes (new `startedAt`) | No | No |
-| Extra components | Reloader | Configuration Watcher | Config Server, RabbitMQ |
-| Status | Working | Working | Working |
+| | Way A | Way B | Way C | Way D |
+|---|---|---|---|---|
+| Source | ConfigMap | ConfigMap | Git repository via Config Server | Helm chart in a Git repository via Argo CD |
+| Enters the pod as | Environment variables | Files in `/etc/config/` | HTTP fetch from the Config Server | Environment variables, from the ConfigMap that Argo CD renders |
+| Read by Spring | Once, at process start | On every refresh (`configtree:`) | On every refresh (`configserver:`) | Once, at process start |
+| Activation | Rolling restart, started by Reloader | Configuration Watcher calls `/actuator/refresh` after `refreshDelay` | `POST /actuator/busrefresh` on the Config Server, sent to every replica over RabbitMQ | Rolling restart, started by the sync: the annotation `checksum/config` of the pod template changes |
+| Pod restarted? | Yes (new `startedAt`) | No | No | Yes |
+| Extra components | Reloader | Configuration Watcher | Config Server, RabbitMQ | Argo CD application controller, repo server, Redis |
+| Status | Working | Working | Working | Working by hand. Not run by the runner yet |
 
 ### Way A in detail
 
@@ -340,6 +349,45 @@ every Way C number contains a round trip to GitHub. The pods need the Config
 Server when they start (`SPRING_CONFIG_IMPORT` is
 `configserver:http://config-server.platform.svc:8888`).
 
+### Way D in detail
+
+```mermaid
+sequenceDiagram
+    participant Op as Operator
+    participant Git as Git repository (GitHub)
+    participant AC as Argo CD
+    participant K8s as Kubernetes
+    participant Old as Old pods (v1)
+    participant New as New pods (v2)
+
+    Op->>Git: commit and push values.yaml (v1 → v2)
+    Note over Old: still serving v1
+    Op->>AC: refresh request (stands for the webhook)
+    AC->>Git: fetch the branch way-d
+    AC->>AC: render the Helm chart
+    AC->>K8s: apply ConfigMap and Deployment (new checksum/config)
+    loop three times (maxSurge 1, maxUnavailable 0)
+        K8s->>New: start one new pod
+        New-->>K8s: readiness probe passes
+        K8s->>Old: stop one old pod
+    end
+    Note over Old,New: mixed answers during the rolling restart, as in Way A
+```
+
+Nobody applies the Deployment in Way D. The Application
+`deploy/way-d-gitops/application.yaml` tells Argo CD to make the namespace
+`thesis` look like the folder `probe-service` on the branch `way-d`. The chart
+puts the hash of the rendered ConfigMap on the pod template, so a new value in
+`values.yaml` changes the pod template and Kubernetes restarts the pods one by
+one.
+
+The Application syncs automatically and without self-heal. Argo CD acts once per
+new commit and leaves later changes in the cluster alone. That is what lets the
+runner set `CONFIG_GATE_ENABLED` and lets the other approaches use the same
+Deployment name. In one change by hand on 2026-11-21 the first answer with v2
+came 21 s after the refresh request and the last answer with v1 after 49 s. Steps
+by hand are in the [Way D runbook](runbook-way-d.md).
+
 ## Design decisions
 
 Each decision is recorded in full, with rejected alternatives, in
@@ -360,6 +408,9 @@ Each decision is recorded in full, with rejected alternatives, in
 | A run is INVALID only when the instrument failed | Bad behaviour of an approach is a result and stays in the data |
 | Scenarios as files executed by the core | An approach cannot shape its own test |
 | Readiness gate in probe-service behind `CONFIG_GATE_ENABLED` | An invalid configuration gets an effect that is the same for every approach |
+| Way D with Argo CD and a Helm chart | The fourth approach is built the way a team with GitOps would build it |
+| Argo CD without self-heal, on its own branch | It must not undo the gate setting of the runner or the Deployment of another approach |
+| Way D's trigger is a refresh request | It stands for the webhook that GitHub cannot send to a local cluster |
 
 ## Data flow of one observation
 
@@ -381,8 +432,10 @@ connection for each request.
 | All kind nodes share one clock and kernel | Real clock offset between nodes is not reproduced | Primary metric is measured on the runner's clock; stated as a threat to validity |
 | Nodes share the machine's CPUs | Heavy background load can distort results | No other heavy work during measurement campaigns |
 | A replica is only observed when a request reaches it | Measured window is a lower bound | Sampling bound derived and reported |
-| Way C reads from GitHub over the internet | Its commit and propagation times include network latency | Kept for realism. P3 and the `sourceCheck` duration are recorded per run |
+| Way C and Way D read from GitHub over the internet | Their commit and propagation times include network latency | Kept for realism. P3 and the `sourceCheck` duration are recorded per run |
+| Argo CD runs with self-heal off | The correction of drift, a main reason for GitOps, is not part of the experiment | Stated |
+| Argo CD runs in the background of every run since 2026-11-21 | Numbers from earlier campaigns were measured without it | A smoke campaign before the full campaigns, see [journal entry 10](journal/10-way-d-argo-cd-and-helm.md#open-points) |
 | Each approach is measured in one configuration | Way B's 90 s is its `refreshDelay`, Way A's window depends on readiness time and surge settings | Results describe configurations, settings documented |
-| S3 takes all delivery components of an approach down at once | For Way C the effects of Config Server and RabbitMQ are not separated | Stated |
+| S3 takes all delivery components of an approach down at once | For Way C the effects of Config Server and RabbitMQ are not separated, for Way D those of the three Argo CD components | Stated |
 
 The full list is in the [plan](../docs/experiment-plan.md#scientific-limitations).
