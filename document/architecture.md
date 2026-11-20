@@ -66,6 +66,7 @@ flowchart LR
 | Way C manifests | `deploy/way-c-configserver/` | Same service, configuration fetched from the Config Server, Bus enabled. |
 | Platform | `deploy/platform/`, `deploy/reloader/` | Namespace `platform` with the delivery components of all approaches: Reloader (Way A), the Configuration Watcher (Way B), Config Server and RabbitMQ (Way C). Installed once. All of them run during every run. |
 | Config Server | `services/config-server/` | Spring Cloud Config Server that reads a Git repository on GitHub. |
+| Monitoring | `deploy/monitoring/` | Namespace `monitoring` with Loki, Alloy and Grafana on the control-plane node. Keeps the pod logs and shows loaded results. It is not part of what is measured. See the [monitoring runbook](runbook-monitoring.md). |
 | Experiment runner | `tools/experiment-runner/` | Measurement instrument and fixed core: campaigns, load, resource sampling, evaluation. See [Experiment runner](runner.md). |
 | Protocol, scenarios, approaches, campaigns | `protocol/`, `scenarios/`, `approaches/`, `campaigns/` | The input files of a campaign. See [Input files](runner.md#input-files). |
 

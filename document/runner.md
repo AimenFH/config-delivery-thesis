@@ -55,13 +55,14 @@ minutes at a time. This campaign started at 15:57 and wrote its last file at 16:
 
 ## Arguments
 
-The runner has three modes. The first matching argument decides.
+The runner has four modes. The first matching argument decides.
 
 | Argument | Meaning |
 |---|---|
 | `--campaign <file>` | Runs a campaign from a campaign file, then evaluates its folder. All other arguments are ignored |
 | `--evaluate <campaign dir>` | Rebuilds `runs.csv` and `summary.csv` of a campaign folder from its raw files. Touches nothing in the cluster |
-| none of the two | The old [single-run mode](#single-run-mode) |
+| `--loki <campaign dir>` | Sends the requests and steps of every run of a campaign folder to Loki. `--loki-url` names Loki, default `http://localhost:3100`. `--grafana-url` is used for the printed links, default `http://localhost:3000`. A run that is already in Loki is skipped. See the [monitoring runbook](runbook-monitoring.md#4-load-the-results-of-a-campaign) |
+| none of the three | The old [single-run mode](#single-run-mode) |
 
 A campaign has no argument for rate, durations, replicas or repetitions. These
 values come from the protocol file and the campaign file only.
@@ -630,6 +631,7 @@ flowchart LR
 | `MetricId`, `Metric`, `RunMetrics` | The 27 metric ids, one value of a metric column, the result of one run |
 | `Statistics`, `Summary`, `Csv` | Quartiles, bootstrap, Cliff's delta, `summary.csv`, CSV formatting |
 | `RunStore`, `ResultWriter` | Writes and reads the files of a run |
+| `LokiExport` | Turns a run into three streams of lines (`request`, `step`, `run`) and sends them to Loki in batches of 2 000 lines |
 | `CampaignRecord` | The content of `campaign.json` |
 | `RunSettings`, `RunResult` | Settings and result of the single-run mode |
 

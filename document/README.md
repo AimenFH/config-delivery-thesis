@@ -53,6 +53,7 @@ follow [the Way A runbook](runbook-way-a.md#3-run-the-experiment).
 | [Experiment runner](runner.md) | know the arguments, the input files, the files of a campaign and the exit codes |
 | [Runbook: experiment 1](runbook-experiment-1.md) | run a smoke or full campaign, evaluate a folder again, add an approach or a scenario, fix a stopped campaign |
 | [Runbook: Way A experiment](runbook-way-a.md) | set up the cluster and run Way A by hand |
+| [Runbook: logs and results in Grafana](runbook-monitoring.md) | install Loki, Alloy and Grafana, read the pod logs, load a campaign and look at a run |
 | [Code walkthrough](code-walkthrough.md) | learn the code: every class, every metric with a worked example, one run from `main` to `summary.csv` |
 | [Experiment plan](../docs/experiment-plan.md) | read the specification of protocol version 1 |
 | [Design decisions](../docs/DECISIONS.md) | see each decision with the alternatives I rejected |
@@ -71,10 +72,11 @@ Journal entries:
 | [06](journal/06-experiment-protocol.md) | Experiment protocol version 1 and the smoke campaigns |
 | [07](journal/07-way-b-gate-deadlock.md) | Why Way B did not recover in S2 |
 | [08](journal/08-open-points-in-the-runner.md) | Three open points closed in the runner |
+| [09](journal/09-loki-and-grafana.md) | Logs and results in Grafana with Loki |
 
 ## Project status
 
-State on 2026-11-19.
+State on 2026-11-20.
 
 | Part | State |
 |---|---|
@@ -85,10 +87,11 @@ State on 2026-11-19.
 | Way C: Config Server and Spring Cloud Bus | Working; Config Server reads a Git repository on GitHub, refresh over RabbitMQ |
 | Shared `platform` namespace for all delivery components | Working |
 | Experiment plan, protocol version 1 | Frozen on 2026-11-15 |
-| Experiment runner | Working: campaigns in randomized blocks, three scenarios, adapter per approach, resource sampling, 27 metrics computed from raw data, `--evaluate`. Three verdict and metric rules changed on 2026-11-19, 498 unit tests pass |
+| Experiment runner | Working: campaigns in randomized blocks, three scenarios, adapter per approach, resource sampling, 27 metrics computed from raw data, `--evaluate`, `--loki`. Three verdict and metric rules changed on 2026-11-19, 510 unit tests pass |
 | Smoke campaign S1 valid change | Run: 6 runs, all VALID |
 | Smoke campaign S2 invalid configuration | Run: 3 runs, all VALID. Way B did not recover: the Watcher sends no refresh to pods that are not ready, see [journal entry 07](journal/07-way-b-gate-deadlock.md) |
 | Smoke campaign S3 infrastructure outage | Run on 2026-11-15: Way A and Way B VALID, Way C INVALID in all 3 attempts, exit code 2. Run again on 2026-11-19 with the new rules: one valid run per approach, Way C VALID with `TRIGGER_FAILED`, two first attempts INVALID for schedule lag, see [journal entry 08](journal/08-open-points-in-the-runner.md) |
-| Full campaigns S1, S2, S3 | Not run. They are the last step, together with the decision model. They wait for the open points in [journal entry 07](journal/07-way-b-gate-deadlock.md#open-points) and [journal entry 08](journal/08-open-points-in-the-runner.md#open-points) |
-| Monitoring with Prometheus and Grafana | Planned, postponed |
+| Full campaigns S1, S2, S3 | Not run. They are the last step, together with the decision model. They wait for the open points in journal entries [07](journal/07-way-b-gate-deadlock.md#open-points), [08](journal/08-open-points-in-the-runner.md#open-points) and [09](journal/09-loki-and-grafana.md#open-points) |
+| Logs and results in Grafana with Loki and Alloy | Working in the namespace `monitoring`: pod logs of `thesis` and `platform`, two dashboards, results loaded with `tools/loki-load.sh`. No campaign has run with it yet, see [journal entry 09](journal/09-loki-and-grafana.md) |
+| Metrics with Prometheus | Not built. The runner reads resource data from the kubelet itself |
 | Angular dashboard | Planned, last |

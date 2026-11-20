@@ -1030,6 +1030,93 @@ is set, so the volume can fill up.
 
 ---
 
+## 2026-11-20: Alloy reads pod logs through the Kubernetes API, with rights in two namespaces
+
+**Problem.** Loki stores what it is sent and collects nothing itself. Something
+has to read the logs of the pods in `thesis` and `platform`, add labels that
+say where a line comes from, and send it on. The pods of a run are on the three
+workers, which should carry as little extra load as possible.
+
+**Rejected.** Promtail, which Grafana Labs replaced with Alloy. A DaemonSet
+that reads the log files on every node, which puts a collector on each worker
+and needs a mount of the node's file system. A ClusterRole, which would let the
+collector read the logs of every namespace.
+
+**Chosen.** One Alloy pod, version 1.22.0, on the control-plane node. Its
+component `loki.source.kubernetes` reads the logs through the API server. Two
+Roles give its ServiceAccount `get`, `list` and `watch` on pods and their logs
+in `thesis` and in `platform`, and nowhere else. Every line gets the labels
+`namespace`, `app`, `pod`, `container` and `node`.
+
+**Cost.** Every log line passes through the API server and the kubelet of its
+node, which the approaches use too. The read positions are kept in an
+`emptyDir`. When the Alloy pod is replaced it reads the logs of the running
+containers from their start and sends them again. A container that ends before
+Alloy has seen it leaves no log in Loki. The label `pod` makes new streams in
+every run, because every run has new pod names.
+
+---
+
+## 2026-11-20: Grafana is built from files and has no login
+
+**Problem.** I want to read logs and results in a browser. A data source or a
+dashboard that is clicked together in the browser lives in the database of the
+Grafana pod and is gone with the pod.
+
+**Rejected.** An admin password in a Secret, which is one more secret to keep
+for a page that only a port-forward can reach. A volume for Grafana's database,
+which would be a second copy of the dashboards that can differ from the files
+in git. A NodePort Service: the kind cluster maps only port 30080 to the
+machine, and another port needs a new cluster.
+
+**Chosen.** Grafana 13.3.1 runs as one pod on the control-plane node. The Loki
+data source and the two dashboards come from ConfigMaps in
+`deploy/monitoring/grafana.yaml` and `deploy/monitoring/grafana-dashboards.yaml`.
+Anonymous access has the role Admin and the login form is off. Grafana is
+reached with `kubectl port-forward`. Usage reporting and update checks are off.
+
+**Cost.** Everyone who can reach the port is an administrator. That is
+acceptable only as long as no Service exposes Grafana outside the cluster. A
+change made in the browser is lost at the next restart, so a dashboard has to
+be changed in its file. The dashboards are JSON inside a YAML file, which is
+hard to read and to compare between versions.
+
+---
+
+## 2026-11-20: The results of a campaign are loaded into Loki after it has ended
+
+**Problem.** The raw results are NDJSON files with one line per request. I
+want to see which version each pod answered over time, next to the pod logs of
+the same minutes, without a second data store.
+
+**Rejected.** Prometheus, which would have to collect in the cluster during a
+run, while the results are complete in files afterwards. Letting the runner
+send to Loki during a run, which adds work to the measuring process and makes a
+run depend on Loki. The labels `pod` and `configVersion` on every request,
+which multiplies the streams of a run. The two values stay in the line and are
+read with `| json` in the query.
+
+**Chosen.** The runner has the mode `--loki <campaign dir>` in the class
+`LokiExport`. `tools/loki-load.sh` opens a port-forward to Loki, starts that
+mode and closes the port-forward. A run becomes three streams with the label
+`kind`: `request`, `step` and `run`. The other labels are `job="runner"`,
+`campaign`, `scenario`, `approach` and `run_id`. Every line carries the wall
+clock time of its event, the start of the run plus the offset the runner
+measured. Before a run is loaded the exporter asks Loki for it and skips it if
+it is there. Loki needs three settings for this: `reject_old_samples: false`,
+higher ingestion limits, and `query_store_max_look_back_period: -1` in the
+ingester.
+
+**Cost.** Loading is a step by hand after a campaign. The question to Loki is
+the only protection against loading a run twice, and Loki does store a run
+twice: that happened once, before the third setting was in. The results exist
+in two places. The files stay the source of `runs.csv` and `summary.csv`, and
+Loki is only for looking. The times of the results come from the clock of the
+machine and the times of the pod logs from the nodes. In kind both are the same
+machine.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>
