@@ -1,0 +1,7 @@
+image: probe-service:0.2.0
+replicas: 3
+
+config:
+  value: hello
+  configVersion: v1
+  timeoutMs: "1000"

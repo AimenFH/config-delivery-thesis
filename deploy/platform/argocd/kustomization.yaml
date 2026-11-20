@@ -1,0 +1,34 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: platform
+
+resources:
+  - https://github.com/argoproj/argo-cd//manifests/crds?ref=v3.5.8
+  - https://github.com/argoproj/argo-cd//manifests/cluster-rbac/application-controller?ref=v3.5.8
+  - https://github.com/argoproj/argo-cd//manifests/base/config?ref=v3.5.8
+  - https://github.com/argoproj/argo-cd//manifests/base/application-controller-deployment?ref=v3.5.8
+  - https://github.com/argoproj/argo-cd//manifests/base/repo-server?ref=v3.5.8
+  - https://github.com/argoproj/argo-cd//manifests/base/redis?ref=v3.5.8
+
+images:
+  - name: quay.io/argoproj/argocd
+    newTag: v3.5.8
+
+patches:
+  - target:
+      kind: StatefulSet
+      name: argocd-application-controller
+    patch: |
+      $patch: delete
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: argocd-application-controller
+  - target:
+      kind: ClusterRoleBinding
+      name: argocd-application-controller
+    patch: |
+      - op: replace
+        path: /subjects/0/namespace
+        value: platform

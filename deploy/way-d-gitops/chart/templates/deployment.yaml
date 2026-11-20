@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: probe-service
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels: {app: probe-service}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels: {app: probe-service}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          nodeTaintsPolicy: Honor
+          matchLabelKeys: [pod-template-hash]
+          labelSelector:
+            matchLabels: {app: probe-service}
+      containers:
+        - name: probe
+          image: {{ .Values.image }}
+          imagePullPolicy: IfNotPresent
+          ports: [{containerPort: 8080}]
+          env:
+            - name: DEMO_VALUE
+              valueFrom: {configMapKeyRef: {name: demo-config-gitops, key: value}}
+            - name: DEMO_CONFIGVERSION
+              valueFrom: {configMapKeyRef: {name: demo-config-gitops, key: configVersion}}
+            - name: DEMO_TIMEOUTMS
+              valueFrom: {configMapKeyRef: {name: demo-config-gitops, key: timeoutMs}}
+          readinessProbe:
+            httpGet: {path: /actuator/health/readiness, port: 8080}
+            periodSeconds: 2
+          lifecycle:
+            preStop:
+              sleep: {seconds: 5}
+          resources:
+            requests: {cpu: "250m", memory: "384Mi"}
+            limits:   {cpu: "500m", memory: "512Mi"}

@@ -1,0 +1,35 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: thesis
+  namespace: platform
+spec:
+  description: Configuration delivery experiment
+  sourceRepos:
+    - https://github.com/AimenFH/config-delivery-config.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: thesis
+  namespaceResourceWhitelist:
+    - {group: "", kind: ConfigMap}
+    - {group: "", kind: Service}
+    - {group: apps, kind: Deployment}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: way-d
+  namespace: platform
+spec:
+  project: thesis
+  source:
+    repoURL: https://github.com/AimenFH/config-delivery-config.git
+    targetRevision: way-d
+    path: probe-service
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: thesis
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: false
