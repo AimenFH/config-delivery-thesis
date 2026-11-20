@@ -1001,6 +1001,35 @@ run once, in the Way C run of the S3 smoke campaign of 2026-11-19.
 
 ---
 
+## 2026-11-20: Loki runs in its own namespace on the control-plane node
+
+**Problem.** To find the cause of the Way B deadlock I had to switch on debug
+logging by hand and save the Watcher's log to a file. The pods of a run are
+deleted before the next run, and their logs go with them. I want the logs of
+every run kept and searchable, without changing what the runner measures.
+
+**Rejected.** Putting Loki into `platform`, which holds the delivery components
+that the approaches are compared on. Installing it with a Helm chart: Helm is
+not installed, the repository uses plain manifests, and a chart hides the
+objects I want to understand. The distributed mode of Loki, which needs object
+storage and several pods. Starting Loki only for a diagnosis, which keeps no
+logs of campaign runs and makes the cluster of a diagnosis differ from the
+cluster of a campaign.
+
+**Chosen.** A namespace `monitoring` with the manifests in `deploy/monitoring/`.
+Loki 3.7.10 runs as one process in a StatefulSet with a 5 Gi volume and stores
+on the local filesystem, without authentication and with usage reporting off. A
+`nodeSelector` and a toleration place it on the control-plane node, away from
+the three workers that run the probe pods. It stays up during campaigns.
+
+**Cost.** The control-plane node also runs the API server and etcd, which every
+approach uses, so Loki's load is not free of effect on the measurement. I have
+not compared a smoke campaign with and without it yet. The logs live on one
+volume of one kind node and are gone when the cluster is deleted. No retention
+is set, so the volume can fill up.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>

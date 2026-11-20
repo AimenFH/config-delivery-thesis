@@ -29,6 +29,12 @@ public final class Runner {
         if (evaluate != null) {
             System.exit(Wiring.evaluate(Path.of(evaluate)));
         }
+        String loki = arg(args, "--loki", null);
+        if (loki != null) {
+            System.exit(LokiExport.campaign(Path.of(loki),
+                    URI.create(arg(args, "--loki-url", "http://localhost:3100")),
+                    arg(args, "--grafana-url", "http://localhost:3000")));
+        }
 
         RunSettings settings = new RunSettings(
                 URI.create(arg(args, "--url", "http://localhost:30080/probe")),

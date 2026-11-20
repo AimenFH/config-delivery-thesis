@@ -1,0 +1,769 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+  namespace: monitoring
+data:
+  provider.yaml: |
+    apiVersion: 1
+    providers:
+      - name: thesis
+        folder: Thesis
+        type: file
+        disableDeletion: true
+        allowUiUpdates: false
+        updateIntervalSeconds: 30
+        options:
+          path: /etc/grafana/dashboards
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+data:
+  cluster-logs.json: |
+    {
+      "uid": "cluster-logs",
+      "title": "Cluster logs",
+      "tags": ["thesis", "logs"],
+      "timezone": "browser",
+      "editable": false,
+      "graphTooltip": 1,
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "",
+      "time": {"from": "now-1h", "to": "now"},
+      "links": [{"title": "Run results", "type": "link", "url": "/d/run-results/run-results", "keepTime": false}],
+      "templating": {
+        "list": [
+          {
+            "name": "search",
+            "label": "Search text",
+            "type": "textbox",
+            "query": "",
+            "current": {"selected": true, "text": "", "value": ""},
+            "options": [{"selected": true, "text": "", "value": ""}]
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Log lines per component",
+          "type": "timeseries",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"x": 0, "y": 0, "w": 12, "h": 7},
+          "fieldConfig": {
+            "defaults": {
+              "custom": {"drawStyle": "bars", "fillOpacity": 80, "stacking": {"mode": "normal"}},
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {"type": "loki", "uid": "loki"},
+              "queryType": "range",
+              "expr": "sum by (app) (count_over_time({namespace=~\"thesis|platform\"} |~ \"(?i)$search\" [$__auto]))",
+              "legendFormat": "{{app}}"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Warnings and errors per component",
+          "type": "timeseries",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"x": 12, "y": 0, "w": 12, "h": 7},
+          "fieldConfig": {
+            "defaults": {
+              "custom": {"drawStyle": "bars", "fillOpacity": 80, "stacking": {"mode": "normal"}},
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {"type": "loki", "uid": "loki"},
+              "queryType": "range",
+              "expr": "sum by (app) (count_over_time({namespace=~\"thesis|platform\"} |~ \"(?i)(warn|error|exception)\" [$__auto]))",
+              "legendFormat": "{{app}}"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "probe-service, all pods",
+          "type": "logs",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"x": 0, "y": 7, "w": 24, "h": 9},
+          "options": {"showTime": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending", "dedupStrategy": "none"},
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {"type": "loki", "uid": "loki"},
+              "queryType": "range",
+              "expr": "{app=\"probe-service\"} |~ \"(?i)$search\"",
+              "maxLines": 500
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Way A: Reloader",
+          "type": "logs",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"x": 0, "y": 16, "w": 12, "h": 9},
+          "options": {"showTime": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending", "dedupStrategy": "none"},
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {"type": "loki", "uid": "loki"},
+              "queryType": "range",
+              "expr": "{app=\"reloader-reloader\"} |~ \"(?i)$search\"",
+              "maxLines": 500
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Way B: Configuration Watcher",
+          "type": "logs",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"x": 12, "y": 16, "w": 12, "h": 9},
+          "options": {"showTime": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending", "dedupStrategy": "none"},
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {"type": "loki", "uid": "loki"},
+              "queryType": "range",
+              "expr": "{app=\"config-watcher\"} |~ \"(?i)$search\"",
+              "maxLines": 500
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Way C: Config Server",
+          "type": "logs",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"x": 0, "y": 25, "w": 12, "h": 9},
+          "options": {"showTime": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending", "dedupStrategy": "none"},
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {"type": "loki", "uid": "loki"},
+              "queryType": "range",
+              "expr": "{app=\"config-server\"} |~ \"(?i)$search\"",
+              "maxLines": 500
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Way C: RabbitMQ",
+          "type": "logs",
+          "datasource": {"type": "loki", "uid": "loki"},
+          "gridPos": {"x": 12, "y": 25, "w": 12, "h": 9},
+          "options": {"showTime": true, "wrapLogMessage": true, "enableLogDetails": true, "sortOrder": "Descending", "dedupStrategy": "none"},
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {"type": "loki", "uid": "loki"},
+              "queryType": "range",
+              "expr": "{app=\"rabbitmq\"} |~ \"(?i)$search\"",
+              "maxLines": 500
+            }
+          ]
+        }
+      ]
+    }
+  run-results.json: |
+    {
+      "uid": "run-results",
+      "title": "Run results",
+      "tags": [
+        "thesis",
+        "results"
+      ],
+      "timezone": "browser",
+      "editable": false,
+      "graphTooltip": 1,
+      "schemaVersion": 39,
+      "version": 1,
+      "refresh": "",
+      "time": {
+        "from": "now-7d",
+        "to": "now"
+      },
+      "links": [
+        {
+          "title": "Cluster logs",
+          "type": "link",
+          "url": "/d/cluster-logs/cluster-logs",
+          "keepTime": true
+        }
+      ],
+      "annotations": {
+        "list": [
+          {
+            "name": "Scenario steps",
+            "datasource": {
+              "type": "loki",
+              "uid": "loki"
+            },
+            "enable": true,
+            "iconColor": "orange",
+            "expr": "{job=\"runner\", kind=\"step\", run_id=\"$run\"} | json | line_format \"{{.step}}: exit code {{.exitCode}}, {{.durationMs}} ms\"",
+            "titleFormat": "{{step}}"
+          }
+        ]
+      },
+      "templating": {
+        "list": [
+          {
+            "name": "run",
+            "label": "Run",
+            "type": "query",
+            "datasource": {
+              "type": "loki",
+              "uid": "loki"
+            },
+            "refresh": 2,
+            "sort": 2,
+            "includeAll": false,
+            "multi": false,
+            "query": {
+              "label": "run_id",
+              "refId": "LokiVariableQueryEditor-VariableQuery",
+              "stream": "{job=\"runner\"}",
+              "type": 1
+            },
+            "current": {},
+            "options": []
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Runs in the selected time range. Click a run id to open it",
+          "type": "table",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 0,
+            "w": 24,
+            "h": 6
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "queryType": "range",
+              "expr": "{job=\"runner\", kind=\"run\"}",
+              "maxLines": 1000
+            }
+          ],
+          "transformations": [
+            {
+              "id": "extractFields",
+              "options": {
+                "source": "Line",
+                "format": "json",
+                "replace": true,
+                "keepTime": false
+              }
+            },
+            {
+              "id": "organize",
+              "options": {
+                "indexByName": {
+                  "runId": 0,
+                  "approach": 1,
+                  "scenario": 2,
+                  "campaign": 3,
+                  "block": 4,
+                  "attempt": 5,
+                  "requests": 6,
+                  "fromEpochMillis": 7,
+                  "toEpochMillis": 8
+                },
+                "excludeByName": {},
+                "renameByName": {}
+              }
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "align": "left"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "runId"
+                },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "Open this run",
+                        "url": "/d/run-results/run-results?var-run=${__data.fields.runId}&from=${__data.fields.fromEpochMillis.numeric}&to=${__data.fields.toEpochMillis.numeric}"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "fromEpochMillis"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "dateTimeAsIso"
+                  },
+                  {
+                    "id": "displayName",
+                    "value": "from"
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "toEpochMillis"
+                },
+                "properties": [
+                  {
+                    "id": "unit",
+                    "value": "dateTimeAsIso"
+                  },
+                  {
+                    "id": "displayName",
+                    "value": "to"
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "showHeader": true,
+            "cellHeight": "sm"
+          }
+        },
+        {
+          "id": 2,
+          "title": "Version answered by each pod",
+          "type": "state-timeline",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "interval": "1s",
+          "gridPos": {
+            "x": 0,
+            "y": 6,
+            "w": 24,
+            "h": 7
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "fillOpacity": 80,
+                "lineWidth": 0,
+                "spanNulls": false
+              },
+              "mappings": [
+                {
+                  "type": "value",
+                  "options": {
+                    "0": {
+                      "text": "v0",
+                      "color": "red",
+                      "index": 0
+                    },
+                    "1": {
+                      "text": "v1",
+                      "color": "blue",
+                      "index": 1
+                    },
+                    "2": {
+                      "text": "v2",
+                      "color": "green",
+                      "index": 2
+                    },
+                    "3": {
+                      "text": "v3",
+                      "color": "purple",
+                      "index": 3
+                    }
+                  }
+                }
+              ]
+            },
+            "overrides": []
+          },
+          "options": {
+            "mergeValues": true,
+            "showValue": "auto",
+            "rowHeight": 0.85,
+            "alignValue": "center",
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "single"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "queryType": "range",
+              "expr": "max by (pod) (max_over_time({job=\"runner\", kind=\"request\", run_id=\"$run\"} | json pod=\"pod\", configVersion=\"configVersion\", ok=\"ok\", latencyMs=\"latencyMs\" | ok=\"true\" | regexp \"\\\"configVersion\\\":\\\"v(?P<versionNumber>[0-9]+)\\\"\" | unwrap versionNumber [$__interval]))",
+              "legendFormat": "{{pod}}"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Answers per second by version",
+          "type": "timeseries",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "interval": "1s",
+          "gridPos": {
+            "x": 0,
+            "y": 13,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 1,
+                "fillOpacity": 30,
+                "showPoints": "never",
+                "stacking": {
+                  "mode": "normal"
+                }
+              },
+              "unit": "reqps",
+              "min": 0
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "v0"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "red"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "v1"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "blue"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "v2"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "green"
+                    }
+                  }
+                ]
+              },
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "v3"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "purple"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "queryType": "range",
+              "expr": "sum by (configVersion) (rate({job=\"runner\", kind=\"request\", run_id=\"$run\"} | json pod=\"pod\", configVersion=\"configVersion\", ok=\"ok\", latencyMs=\"latencyMs\" | ok=\"true\" [$__interval]))",
+              "legendFormat": "{{configVersion}}"
+            }
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Latency of answered requests",
+          "type": "timeseries",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "interval": "1s",
+          "gridPos": {
+            "x": 12,
+            "y": 13,
+            "w": 12,
+            "h": 8
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 1,
+                "fillOpacity": 0,
+                "showPoints": "never"
+              },
+              "unit": "ms",
+              "min": 0
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "queryType": "range",
+              "expr": "quantile_over_time(0.5, {job=\"runner\", kind=\"request\", run_id=\"$run\"} | json pod=\"pod\", configVersion=\"configVersion\", ok=\"ok\", latencyMs=\"latencyMs\" | ok=\"true\" | unwrap latencyMs [$__interval]) by (run_id)",
+              "legendFormat": "p50"
+            },
+            {
+              "refId": "B",
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "queryType": "range",
+              "expr": "quantile_over_time(0.99, {job=\"runner\", kind=\"request\", run_id=\"$run\"} | json pod=\"pod\", configVersion=\"configVersion\", ok=\"ok\", latencyMs=\"latencyMs\" | ok=\"true\" | unwrap latencyMs [$__interval]) by (run_id)",
+              "legendFormat": "p99"
+            },
+            {
+              "refId": "C",
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "queryType": "range",
+              "expr": "max_over_time({job=\"runner\", kind=\"request\", run_id=\"$run\"} | json pod=\"pod\", configVersion=\"configVersion\", ok=\"ok\", latencyMs=\"latencyMs\" | ok=\"true\" | unwrap latencyMs [$__interval]) by (run_id)",
+              "legendFormat": "max"
+            }
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Failed requests per second",
+          "type": "timeseries",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "interval": "1s",
+          "gridPos": {
+            "x": 0,
+            "y": 21,
+            "w": 12,
+            "h": 6
+          },
+          "fieldConfig": {
+            "defaults": {
+              "custom": {
+                "drawStyle": "line",
+                "lineWidth": 1,
+                "fillOpacity": 0,
+                "showPoints": "never"
+              },
+              "unit": "reqps",
+              "min": 0
+            },
+            "overrides": [
+              {
+                "matcher": {
+                  "id": "byName",
+                  "options": "failed"
+                },
+                "properties": [
+                  {
+                    "id": "color",
+                    "value": {
+                      "mode": "fixed",
+                      "fixedColor": "red"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "queryType": "range",
+              "expr": "sum(rate({job=\"runner\", kind=\"request\", run_id=\"$run\"} | json pod=\"pod\", configVersion=\"configVersion\", ok=\"ok\", latencyMs=\"latencyMs\" | ok=\"false\" [$__interval])) or vector(0)",
+              "legendFormat": "failed"
+            }
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Steps of the run",
+          "type": "logs",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "gridPos": {
+            "x": 12,
+            "y": 21,
+            "w": 12,
+            "h": 6
+          },
+          "options": {
+            "showTime": true,
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "sortOrder": "Ascending",
+            "dedupStrategy": "none"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "queryType": "range",
+              "expr": "{job=\"runner\", kind=\"step\", run_id=\"$run\"} | json | line_format \"{{.step}}: exit code {{.exitCode}}, took {{.durationMs}} ms{{if .detail}}, {{.detail}}{{end}}{{if .configVersion}}, {{.configVersion}}{{end}}\"",
+              "maxLines": 500
+            }
+          ]
+        },
+        {
+          "id": 7,
+          "title": "What the pods and delivery components logged in this time range",
+          "type": "logs",
+          "datasource": {
+            "type": "loki",
+            "uid": "loki"
+          },
+          "gridPos": {
+            "x": 0,
+            "y": 27,
+            "w": 24,
+            "h": 10
+          },
+          "options": {
+            "showTime": true,
+            "wrapLogMessage": true,
+            "enableLogDetails": true,
+            "sortOrder": "Ascending",
+            "dedupStrategy": "none"
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "datasource": {
+                "type": "loki",
+                "uid": "loki"
+              },
+              "queryType": "range",
+              "expr": "{namespace=~\"thesis|platform\"}",
+              "maxLines": 500
+            }
+          ]
+        }
+      ]
+    }
