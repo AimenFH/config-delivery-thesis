@@ -139,6 +139,30 @@ class ClusterControlTest {
     }
 
     @Test
+    void the_ready_workload_pods_leave_out_a_pod_that_is_not_ready_and_a_pod_that_is_being_deleted()
+            throws Exception {
+        ArrayNode items = (ArrayNode) kubectl.pods.path("items");
+        for (JsonNode condition : items.get(0).path("status").path("conditions")) {
+            if (condition.path("type").asText().equals("Ready")) {
+                ((ObjectNode) condition).put("status", "False");
+            }
+        }
+        ((ObjectNode) items.get(1).path("metadata")).put("deletionTimestamp", "2026-11-21T10:00:00Z");
+
+        assertEquals(List.of("probe-service-f664c8f55-ldcdv"), control().readyWorkloadPodNames(clock));
+        assertEquals(3, control().workloadPodNames(clock).size());
+    }
+
+    @Test
+    void a_pod_without_a_ready_condition_does_not_count_as_ready() throws Exception {
+        ArrayNode items = (ArrayNode) kubectl.pods.path("items");
+        ((ObjectNode) items.get(2).path("status")).remove("conditions");
+
+        assertEquals(List.of("probe-service-f664c8f55-7hfd6", "probe-service-f664c8f55-jfsxk"),
+                control().readyWorkloadPodNames(clock));
+    }
+
+    @Test
     void the_pod_list_holds_namespace_name_node_image_id_and_start_time() throws Exception {
         List<RunRecord.PodInfo> pods = control().pods("thesis", clock);
 

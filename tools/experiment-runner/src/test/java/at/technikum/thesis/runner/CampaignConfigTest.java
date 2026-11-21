@@ -43,8 +43,18 @@ class CampaignConfigTest {
     }
 
     @Test
+    void theBadConfigRestartCampaignNeedsTenValidRunsAndItsSmokeCampaignOneBlock() throws Exception {
+        assertEquals(new CampaignConfig("s5", "protocol/protocol-v1.json", "scenarios/s5-bad-config-restart.json",
+                10, 25, 20261115L), CampaignConfig.read(CAMPAIGNS.resolve("s5.json")));
+        assertEquals(new CampaignConfig("s5-smoke", "protocol/protocol-v1.json",
+                "scenarios/s5-bad-config-restart.json", 1, 1, 20261115L),
+                CampaignConfig.read(CAMPAIGNS.resolve("s5-smoke.json")));
+    }
+
+    @Test
     void everyCampaignLoadsItsProtocolScenarioAndTheFourApproaches() throws Exception {
-        for (String name : List.of("s1", "s2", "s3", "s4", "s1-smoke", "s2-smoke", "s3-smoke", "s4-smoke")) {
+        for (String name : List.of("s1", "s2", "s3", "s4", "s5",
+                "s1-smoke", "s2-smoke", "s3-smoke", "s4-smoke", "s5-smoke")) {
             CampaignConfig config = CampaignConfig.read(CAMPAIGNS.resolve(name + ".json"));
 
             CampaignConfig.Loaded loaded = config.load(Fixtures.ROOT);

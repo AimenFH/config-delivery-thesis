@@ -1,0 +1,11 @@
+{
+  "name": "s5-bad-config-restart",
+  "title": "S5 invalid configuration and pod restart",
+  "gate": true,
+  "invalidVersions": ["v2"],
+  "steps": [
+    {"atSeconds": 0, "action": "commit", "payload": {"configVersion": "v2", "timeoutMs": "abc"}},
+    {"atSeconds": 60, "action": "deleteReadyPod"},
+    {"atSeconds": 120, "action": "commit", "payload": {"configVersion": "v3", "timeoutMs": "1000"}}
+  ]
+}

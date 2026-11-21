@@ -1,6 +1,8 @@
 package at.technikum.thesis.runner;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -10,6 +12,7 @@ import java.util.Map;
 
 import static at.technikum.thesis.runner.Scenario.Action.COMMIT;
 import static at.technikum.thesis.runner.Scenario.Action.DELETE_POD;
+import static at.technikum.thesis.runner.Scenario.Action.DELETE_READY_POD;
 import static at.technikum.thesis.runner.Scenario.Action.INFRA_DOWN;
 import static at.technikum.thesis.runner.Scenario.Action.INFRA_UP;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -321,6 +324,62 @@ class StepExecutorTest {
                 SCALE_RABBIT_BACK, READY_SERVER, READY_RABBIT),
                 log.subList(log.indexOf(SCALE_SERVER_BACK), log.size()));
         assertEquals(Map.of("platform/config-server", 1, "platform/rabbitmq", 3), kubectl.replicas);
+    }
+
+    @Test
+    void delete_ready_pod_skips_a_pod_that_is_not_ready_and_deletes_the_first_ready_pod_by_name() throws Exception {
+        notReady(0);
+        time.advance(clock, 150_000);
+
+        RunRecord.StepRecord record = executor().execute(1, new Scenario.Step(60, DELETE_READY_POD, null));
+
+        assertEquals(List.of(GET_PODS, "$ kubectl -n thesis delete pod probe-service-f664c8f55-jfsxk --wait=false"),
+                log);
+        assertEquals("probe-service-f664c8f55-jfsxk", record.detail());
+        assertEquals(0, record.exitCode());
+        assertEquals(150_000, record.startedAt());
+        assertEquals(DELETE_READY_POD, record.action());
+    }
+
+    @Test
+    void delete_ready_pod_deletes_the_first_pod_by_name_when_no_pod_is_ready() throws Exception {
+        notReady(0);
+        notReady(1);
+        notReady(2);
+
+        RunRecord.StepRecord record = executor().execute(1, new Scenario.Step(60, DELETE_READY_POD, null));
+
+        assertEquals(List.of(GET_PODS, GET_PODS, DELETE_FIRST_POD), log);
+        assertEquals("probe-service-f664c8f55-7hfd6", record.detail());
+        assertEquals(0, record.exitCode());
+    }
+
+    @Test
+    void delete_ready_pod_fails_when_there_is_no_pod() throws Exception {
+        kubectl.pods.putArray("items");
+
+        RunRecord.StepRecord record = executor().execute(1, new Scenario.Step(60, DELETE_READY_POD, null));
+
+        assertFalse(record.exitCode() == 0);
+        assertNull(record.detail());
+    }
+
+    @Test
+    void delete_pod_still_deletes_the_first_pod_by_name_when_that_pod_is_not_ready() throws Exception {
+        notReady(0);
+
+        RunRecord.StepRecord record = executor().execute(2, new Scenario.Step(60, DELETE_POD, null));
+
+        assertEquals(List.of(GET_PODS, DELETE_FIRST_POD), log);
+        assertEquals("probe-service-f664c8f55-7hfd6", record.detail());
+    }
+
+    private void notReady(int item) {
+        for (JsonNode condition : kubectl.pods.path("items").get(item).path("status").path("conditions")) {
+            if (condition.path("type").asText().equals("Ready")) {
+                ((ObjectNode) condition).put("status", "False");
+            }
+        }
     }
 
     @Test

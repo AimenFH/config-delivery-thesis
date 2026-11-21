@@ -26,7 +26,8 @@ public record Scenario(
         @JsonProperty("commit") COMMIT,
         @JsonProperty("infraDown") INFRA_DOWN,
         @JsonProperty("infraUp") INFRA_UP,
-        @JsonProperty("deletePod") DELETE_POD
+        @JsonProperty("deletePod") DELETE_POD,
+        @JsonProperty("deleteReadyPod") DELETE_READY_POD
     }
 
     public record Step(int atSeconds, Action action, Payload payload) {

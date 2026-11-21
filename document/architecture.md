@@ -79,9 +79,9 @@ The diagram is the one of the plan.
 flowchart TB
     subgraph core["Fixed core, protocol version 1: identical for every approach"]
         protocol["protocol file<br/>every constant"]
-        scen["scenario files<br/>S1 valid change, S2 invalid configuration, S3 outage, S4 rapid changes"]
+        scen["scenario files<br/>S1 valid change, S2 invalid configuration, S3 outage,<br/>S4 rapid changes, S5 invalid configuration and restart"]
         campaign["Campaign<br/>randomized blocks, fresh deployment, retries"]
-        steps["Step executor<br/>commit, infraDown, infraUp, deletePod"]
+        steps["Step executor<br/>commit, infraDown, infraUp, deletePod, deleteReadyPod"]
         inv["InvariantCheck<br/>same workload and gate setting for all"]
         load["LoadGenerator and ProbeClient<br/>50 req/s on one clock"]
         res["ResourceSampler<br/>CPU and memory every 5 s"]
@@ -227,7 +227,7 @@ Everything after `T0` is delivery time, whether a controller reacts or a trigger
 is called. Way C's `busrefresh` call therefore counts, as the reaction times of
 Reloader and the Watcher do.
 
-## The four scenarios
+## The five scenarios
 
 A scenario is a file in `scenarios/` with timed steps. The steps and offsets are
 the same for every approach, and the core executes them.
@@ -238,9 +238,10 @@ the same for every approach, and the core executes them.
 | S2 invalid configuration | Does a bad configuration reach traffic, what does it cost, how fast does the fix arrive | on | 0 s commit v2 with `timeoutMs` `abc`. 120 s commit v3 with `timeoutMs` 1000 | 360 s | E1 to E4, R1 |
 | S3 infrastructure outage | What happens to a change and to a restarted pod while the delivery components are down | off | 0 s `infraDown`. 30 s commit v2. 60 s `deletePod`. 120 s `infraUp` | 360 s | U1 to U5 |
 | S4 rapid successive changes | Do all replicas end on the last version when a second change follows 10 s after the first, and which versions are served in between | off | 0 s commit v2. 10 s commit v3, both with `timeoutMs` 1000 | 250 s | Q1 to Q7 |
+| S5 invalid configuration and pod restart | What happens to a pod that starts while the invalid configuration is still in the source | on | 0 s commit v2 with `timeoutMs` `abc`. 60 s `deleteReadyPod`. 120 s commit v3 with `timeoutMs` 1000 | 360 s | E1 to E4, R1 |
 
 The load runs for 150 s after the start of the last step, which gives 240 s in S1,
-360 s in S2 and S3, and 250 s in S4.
+360 s in S2, S3 and S5, and 250 s in S4.
 
 Every payload has its own version. The version in an answer therefore tells which
 payload the answering pod runs, and the runner sees an invalid configuration from
@@ -254,6 +255,13 @@ fixed by the scenario and are not a result.
 In S3 `infraDown` scales the infrastructure Deployments of the approach under test
 to 0 and `infraUp` scales them back. The core restores them at the end of every
 run, also after an error, and the next run starts only when they are ready.
+
+S5 is S2 with one step more. `deleteReadyPod` deletes the first pod by name
+among the ready pods, where `deletePod` takes the first by name whether it is
+ready or not. During a stopped rollout of Way A or Way D one pod is unready,
+and S5 must delete a pod that serves. The value to compare with S2 is E4. The
+reasons are in the
+[decision entry](../docs/DECISIONS.md#2026-11-21-s5-deletes-a-ready-pod-while-the-invalid-configuration-waits-at-the-source).
 
 S4 was added on 2026-11-21, after the plan was frozen. The steps of a scenario
 run one after the other, so a commit that takes longer than 10 s pushes the

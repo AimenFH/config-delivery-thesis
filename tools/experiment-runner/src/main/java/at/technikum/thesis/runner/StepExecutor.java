@@ -84,7 +84,8 @@ public final class StepExecutor {
             case COMMIT -> commit(index, step);
             case INFRA_DOWN -> infraDown(index, step);
             case INFRA_UP -> infraUp(index, step);
-            case DELETE_POD -> deletePod(index, step);
+            case DELETE_POD -> deletePod(index, step, false);
+            case DELETE_READY_POD -> deletePod(index, step, true);
         };
     }
 
@@ -181,11 +182,14 @@ public final class StepExecutor {
                 exitCode, String.join("\n", output), null, String.join(", ", detail));
     }
 
-    private RunRecord.StepRecord deletePod(int index, Scenario.Step step) {
+    private RunRecord.StepRecord deletePod(int index, Scenario.Step step, boolean preferReady) {
         double startedAt = pacer.now(clock);
         List<String> names;
         try {
-            names = cluster.workloadPodNames(clock);
+            names = preferReady ? cluster.readyWorkloadPodNames(clock) : List.of();
+            if (names.isEmpty()) {
+                names = cluster.workloadPodNames(clock);
+            }
         } catch (ClusterControl.CommandFailed e) {
             return new RunRecord.StepRecord(index, step.atSeconds(), step.action(), null, startedAt,
                     pacer.now(clock), e.exitCode() == 0 ? -1 : e.exitCode(), e.getMessage(), null, null);

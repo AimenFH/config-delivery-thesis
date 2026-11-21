@@ -48,7 +48,7 @@ follow [the Way A runbook](runbook-way-a.md#3-run-the-experiment).
 
 | Document | Read it when you want to |
 |---|---|
-| [Architecture](architecture.md) | understand how the setup is built and why: the fixed core, the adapter boundary, the timeline of a run, the four scenarios |
+| [Architecture](architecture.md) | understand how the setup is built and why: the fixed core, the adapter boundary, the timeline of a run, the five scenarios |
 | [Probe service API](probe-api.md) | know what each endpoint returns and how the readiness gate works |
 | [Experiment runner](runner.md) | know the arguments, the input files, the files of a campaign and the exit codes |
 | [Runbook: experiment 1](runbook-experiment-1.md) | run a smoke or full campaign, evaluate a folder again, add an approach or a scenario, fix a stopped campaign |
@@ -90,11 +90,12 @@ State on 2026-11-21.
 | Way D: GitOps with Argo CD and Helm | Working by hand: Argo CD 3.5.8 syncs a Helm chart from the branch `way-d`, a new value restarts the pods. In the protocol file since 2026-11-21, not run by the runner yet, see [journal entry 10](journal/10-way-d-argo-cd-and-helm.md) |
 | Shared `platform` namespace for all delivery components | Working |
 | Experiment plan, protocol version 1 | Frozen on 2026-11-15 |
-| Experiment runner | Working: campaigns in randomized blocks, four scenarios, adapter per approach, resource sampling, 34 metrics computed from raw data, `--evaluate`, `--loki`. Three verdict and metric rules changed on 2026-11-19. S4 added on 2026-11-21, 532 unit tests pass |
+| Experiment runner | Working: campaigns in randomized blocks, five scenarios, adapter per approach, resource sampling, 34 metrics computed from raw data, `--evaluate`, `--loki`. Three verdict and metric rules changed on 2026-11-19. S4 and S5 added on 2026-11-21, 541 unit tests pass |
 | Smoke campaign S1 valid change | Run on 2026-11-15 with three approaches: 6 runs, all VALID |
 | Smoke campaign S2 invalid configuration | Run: 3 runs, all VALID. Way B did not recover: the Watcher sends no refresh to pods that are not ready, see [journal entry 07](journal/07-way-b-gate-deadlock.md) |
 | Smoke campaign S3 infrastructure outage | Run on 2026-11-15: Way A and Way B VALID, Way C INVALID in all 3 attempts, exit code 2. Run again on 2026-11-19 with the new rules: one valid run per approach, Way C VALID with `TRIGGER_FAILED`, two first attempts INVALID for schedule lag, see [journal entry 08](journal/08-open-points-in-the-runner.md) |
 | Scenario S4 rapid successive changes | Defined on 2026-11-21: scenario file, two campaign files, metrics Q1 to Q7 with unit tests. Not run on the cluster, see the [decision entry](../docs/DECISIONS.md#2026-11-21-s4-commits-two-valid-changes-10-seconds-apart) |
+| Scenario S5 invalid configuration and pod restart | Defined on 2026-11-21: scenario file, two campaign files, the new step `deleteReadyPod` with unit tests, metrics of S2. Not run on the cluster, see the [decision entry](../docs/DECISIONS.md#2026-11-21-s5-deletes-a-ready-pod-while-the-invalid-configuration-waits-at-the-source) |
 | Full campaigns S1, S2, S3 | Not run. They are the last step, together with the decision model. They wait for the open points in journal entries [07](journal/07-way-b-gate-deadlock.md#open-points), [08](journal/08-open-points-in-the-runner.md#open-points), [09](journal/09-loki-and-grafana.md#open-points) and [10](journal/10-way-d-argo-cd-and-helm.md#open-points) |
 | Logs and results in Grafana with Loki and Alloy | Working in the namespace `monitoring`: pod logs of `thesis` and `platform`, two dashboards, results loaded with `tools/loki-load.sh`. No campaign has run with it yet, see [journal entry 09](journal/09-loki-and-grafana.md) |
 | Metrics with Prometheus | Not built. The runner reads resource data from the kubelet itself |

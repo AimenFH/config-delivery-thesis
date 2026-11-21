@@ -108,6 +108,28 @@ public final class ClusterControl {
         return names.stream().sorted().toList();
     }
 
+    public List<String> readyWorkloadPodNames(RunnerClock clock) {
+        List<String> names = new ArrayList<>();
+        for (JsonNode pod : workloadPodsJson(clock).path("items")) {
+            if (ready(pod)) {
+                names.add(pod.path("metadata").path("name").asText());
+            }
+        }
+        return names.stream().sorted().toList();
+    }
+
+    private static boolean ready(JsonNode pod) {
+        if (pod.path("metadata").hasNonNull("deletionTimestamp")) {
+            return false;
+        }
+        for (JsonNode condition : pod.path("status").path("conditions")) {
+            if ("Ready".equals(condition.path("type").asText())) {
+                return "True".equals(condition.path("status").asText());
+            }
+        }
+        return false;
+    }
+
     public List<RunRecord.PodInfo> pods(String namespace, RunnerClock clock) {
         return podInfos(podsJson(namespace, clock), protocol.workload().container());
     }

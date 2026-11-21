@@ -11,6 +11,7 @@ import java.util.Set;
 
 import static at.technikum.thesis.runner.Scenario.Action.COMMIT;
 import static at.technikum.thesis.runner.Scenario.Action.DELETE_POD;
+import static at.technikum.thesis.runner.Scenario.Action.DELETE_READY_POD;
 import static at.technikum.thesis.runner.Scenario.Action.INFRA_DOWN;
 import static at.technikum.thesis.runner.Scenario.Action.INFRA_UP;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -84,6 +85,22 @@ class ScenarioTest {
     }
 
     @Test
+    void scenarioFiveDeletesAReadyPodBetweenTheInvalidCommitAndTheFixWithTheGateOn() throws Exception {
+        Scenario scenario = Scenario.read(SCENARIOS.resolve("s5-bad-config-restart.json"));
+
+        assertEquals("s5-bad-config-restart", scenario.name());
+        assertTrue(scenario.gate());
+        assertEquals(List.of("v2"), scenario.invalidVersions());
+        assertEquals(List.of(
+                new Scenario.Step(0, COMMIT, new Payload("v2", "abc")),
+                new Scenario.Step(60, DELETE_READY_POD, null),
+                new Scenario.Step(120, COMMIT, new Payload("v3", "1000"))), scenario.steps());
+        assertEquals(List.of(), scenario.problems(Fixtures.protocol()));
+        assertEquals(120, scenario.lastStepAtSeconds());
+        assertEquals(List.of(new Payload("v2", "abc"), new Payload("v3", "1000")), scenario.payloads());
+    }
+
+    @Test
     void theStructureOfAScenarioDecidesWhichMetricsAreReported() throws Exception {
         Set<MetricId> criteria = EnumSet.of(MetricId.P1, MetricId.P2, MetricId.P3, MetricId.C1, MetricId.C2,
                 MetricId.C3, MetricId.A1, MetricId.A2, MetricId.A3, MetricId.F1, MetricId.F2, MetricId.F3,
@@ -97,6 +114,8 @@ class ScenarioTest {
         assertEquals(EnumSet.of(MetricId.Q1, MetricId.Q2, MetricId.Q3, MetricId.Q4, MetricId.Q5, MetricId.Q6,
                         MetricId.Q7),
                 Scenario.read(SCENARIOS.resolve("s4-rapid-changes.json")).reportedMetrics());
+        assertEquals(EnumSet.of(MetricId.E1, MetricId.E2, MetricId.E3, MetricId.E4, MetricId.R1),
+                Scenario.read(SCENARIOS.resolve("s5-bad-config-restart.json")).reportedMetrics());
     }
 
     @Test

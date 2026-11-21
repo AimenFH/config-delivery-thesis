@@ -1303,6 +1303,99 @@ cluster yet.
 
 ---
 
+## 2026-11-21: Each approach is tested as teams run it, with nothing built for it
+
+**Problem.** The incident reports of 2025 end with the same fixes: staged
+rollout with health checks, and automatic rollback. None of the four
+approaches rolls back by itself. Ways A and D stage a change, because they
+restart pods one at a time (`maxSurge: 1`, `maxUnavailable: 0`) and the
+readiness gate stops the rollout at the first bad pod. Ways B and C refresh
+all replicas within seconds. I had to decide whether every approach gets
+staging and rollback before I compare them, and what a fair comparison is if
+they do not.
+
+**Rejected.** A script for Ways B and C that refreshes one pod, checks it and
+then continues or reverts. The numbers would describe my script, which no team
+runs. Argo Rollouts for Way D only, which would let D win S2 through a tool
+the others did not get. Argo Rollouts for all four: it replaces the Deployment
+of Ways A and D and offers nothing for a refresh in place, so Ways B and C
+would still need code of my own. A rollback command per approach in the
+descriptor, which would let each approach take its own shortest path and make
+R1 hard to compare.
+
+**Chosen.** One rule decides what belongs in the test. An approach is measured
+in the configuration that teams commonly run, tuned by the same rule as
+before. What the mechanism does by itself is a result. What I would have to
+build for it is not part of the test. The staging of Ways A and D counts,
+because it comes from the rolling update, and its absence in Ways B and C is a
+finding. Rollback is the same for every approach: a commit of good values at
+the source, issued by the core at the same offset. In S2 that is the v3 commit
+after 120 s. It stands for a `git revert` by an operator, and R1 is the
+rollback time. What each approach would need for an automatic rollback is
+discussed approach by approach in the thesis text and is not measured. If Argo
+Rollouts is added later, it is a fifth approach with its own descriptor and
+its own control campaign.
+
+**Cost.** The thesis has no measured result for automatic rollback, which is
+what the large operators built after their outages. The 120 s of detection
+time stay a protocol constant, so the gain from faster detection is not shown.
+"Commonly run" rests on tool documentation and on adoption figures such as the
+[CNCF end user survey of 2025](https://cncf.io/announcements/2025/07/24/cncf-end-user-survey-finds-argo-cd-as-majority-adopted-gitops-solution-for-kubernetes).
+I found no data on how teams roll back. The pods of Ways A and D read
+ConfigMaps with fixed names (`demo-config`, `demo-config-gitops`), so going
+back to the old pods would not bring the old values back. That point belongs
+in the text on rollback. Three inequalities remain and are only stated: Ways C
+and D read from GitHub, the Watcher image of Way B runs emulated, and the 10 s
+gap of S4 falls inside the delivery of some approaches and after it for
+others.
+
+---
+
+## 2026-11-21: S5 deletes a ready pod while the invalid configuration waits at the source
+
+**Problem.** In S2 a rolling restart stops at the first pod that does not
+become ready, and the old pods keep serving. In the smoke run Way A exposed 0
+replicas and kept 3 serving. That looks safe, but the invalid value is still
+in the source. Incident reports describe the same state. At
+[Azure Front Door on 29 October 2025](https://techcommunity.microsoft.com/blog/azurenetworkingblog/-/4479416)
+the bad configuration overwrote the last known good snapshot, and loading the
+configuration again took about 4.5 hours. In the
+[Cloudflare outage of 20 February 2026](https://blog.cloudflare.com/cloudflare-outage-february-20-2026/)
+there was no snapshot to go back to, and about 300 prefixes were restored by
+hand. The pods of Ways A and D read ConfigMaps with fixed names, so a pod that
+starts in this state reads the invalid value. S2 has no pod start between the
+bad commit and the fix and cannot show this.
+
+**Rejected.** `deletePod` as in S3. It deletes the first pod by name, ready or
+not. During a stopped rollout of Way A or Way D there are four pods, three old
+and ready and one new and unready, and the name order of two ReplicaSets
+follows their hashes. The step would sometimes delete the pod that serves
+nothing. Changing `deletePod` itself: in S3 all pods are ready, so its runs
+would not change, but the step belongs to the frozen S3. A scale-out step in
+place of a deletion, which needs a replica count other than the fixed 3. A new
+set of metrics: E1 to E4 and R1 already hold what the scenario asks, and with
+the same metrics S5 can be compared with S2 directly.
+
+**Chosen.** `scenarios/s5-bad-config-restart.json` has the steps of S2 with
+one step between them: commit v2 with `timeoutMs` `abc` at 0 s,
+`deleteReadyPod` at 60 s, commit v3 with `timeoutMs` 1000 at 120 s, gate on,
+10 valid runs. The new step `deleteReadyPod` deletes the first pod by name
+among the pods that are ready and not being deleted. If no pod is ready, it
+deletes the first by name, as `deletePod` does. The rule is the same for every
+approach. S5 reports the metrics of S2. The number to read is E4, the lowest
+number of serving replicas, next to the E4 of S2.
+
+**Cost.** One run takes about 8.7 minutes. Four approaches and 10 blocks need
+about 5.8 hours. I expect a difference to S2 only for Ways A and D: 2 serving
+replicas where S2 had 3. In Ways B and C the replicas become unready by the
+refresh anyway, so S5 will mostly repeat S2 for them. That is an expectation
+and not a result. The core has a fifth step. The readiness of a pod is read
+from the Kubernetes API when the step starts and can have changed by the time
+the pod is deleted. E4 counts answering pods in buckets of 2 s, so a short dip
+can be missed. The scenario has unit tests and has not run on the cluster yet.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>

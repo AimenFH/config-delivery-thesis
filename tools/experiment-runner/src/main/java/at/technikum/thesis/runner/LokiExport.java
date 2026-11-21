@@ -187,6 +187,7 @@ public final class LokiExport {
             case INFRA_DOWN -> "infraDown";
             case INFRA_UP -> "infraUp";
             case DELETE_POD -> "deletePod";
+            case DELETE_READY_POD -> "deleteReadyPod";
         };
     }
 

@@ -373,10 +373,10 @@ every approach and all approaches are measured again on the new image.
    scenario.
 3. Run the smoke campaign.
 
-A scenario file can only use the four actions `commit`, `infraDown`, `infraUp` and
-`deletePod`, and it gets one of the three existing sets of metrics, chosen by its
-structure: U1 to U5 with an `infraDown` step, E1 to E4 and R1 with invalid
-versions, P1 to O5 otherwise. A new action or a new metric needs a change in the
+A scenario file can only use the five actions `commit`, `infraDown`, `infraUp`,
+`deletePod` and `deleteReadyPod`, and it gets one of the four existing sets of
+metrics, chosen by its structure: U1 to U5 with an `infraDown` step, E1 to E4 and
+R1 with invalid versions, Q1 to Q7 with more than one commit, P1 to O5 otherwise. A new action or a new metric needs a change in the
 runner and, by the plan, a new protocol version.
 
 The run lasts 90 s plus the offset of the last step plus 150 s.

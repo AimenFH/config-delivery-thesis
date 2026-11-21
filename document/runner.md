@@ -118,7 +118,7 @@ campaigns/s1-smoke.json          which scenario, how many valid runs, block seed
 | `maxBlocks` | Blocks at most. Not more than `maxBlocks` of the protocol (25) |
 | `seed` | Seed of the block order. The same seed gives the same order |
 
-The eight campaign files:
+The ten campaign files:
 
 | File | Scenario | Valid runs | Blocks at most |
 |---|---|---|---|
@@ -126,10 +126,12 @@ The eight campaign files:
 | `campaigns/s2-smoke.json` | S2 | 1 | 1 |
 | `campaigns/s3-smoke.json` | S3 | 1 | 1 |
 | `campaigns/s4-smoke.json` | S4 | 1 | 1 |
+| `campaigns/s5-smoke.json` | S5 | 1 | 1 |
 | `campaigns/s1.json` | S1 | 20 | 25 |
 | `campaigns/s2.json` | S2 | 10 | 25 |
 | `campaigns/s3.json` | S3 | 10 | 25 |
 | `campaigns/s4.json` | S4 | 10 | 25 |
+| `campaigns/s5.json` | S5 | 10 | 25 |
 
 The files in `campaigns/legacy/` have the format of before 2026-11-15
 (`repetitions`, `ways`, `versionKey` and per-Way durations). The runner no longer
@@ -203,7 +205,7 @@ baseline, which is 90 s after the load starts.
 | `gate` | Value of `CONFIG_GATE_ENABLED` that the runner sets on the Deployment |
 | `invalidVersions` | Versions whose payload is invalid. Each must be the version of a payload |
 | `steps[].atSeconds` | Offset of the step. Must not be negative and must not decrease |
-| `steps[].action` | `commit`, `infraDown`, `infraUp` or `deletePod` |
+| `steps[].action` | `commit`, `infraDown`, `infraUp`, `deletePod` or `deleteReadyPod` |
 | `steps[].payload` | Only for `commit`: `configVersion` and `timeoutMs`. Every payload needs its own version, different from `initialVersion` |
 
 An `infraUp` needs an earlier `infraDown`, and an `infraDown` must be followed by
@@ -215,6 +217,7 @@ an `infraUp`.
 | `infraDown` | the core, `kubectl scale` | Remembers the replica count of every infrastructure Deployment of the approach and scales it to 0 |
 | `infraUp` | the core, `kubectl scale` | Scales them back to the remembered count |
 | `deletePod` | the core, `kubectl delete pod --wait=false` | Deletes the probe-service pod that comes first by name |
+| `deleteReadyPod` | the core, `kubectl delete pod --wait=false` | Deletes the first pod by name among those that are ready and not being deleted. If none is ready, the first by name |
 
 The structure of the file also decides which metrics are reported:
 
@@ -469,6 +472,7 @@ Then one column per metric column of the scenario:
 | S2 | `E1`, `E2`, `E3_ratio`, `E3_outage`, `E4`, `R1` |
 | S3 | `U1`, `U2`, `U2_text`, `U3`, `U4`, `U5` |
 | S4 | `Q1`, `Q2`, `Q3`, `Q4_pods`, `Q4_requests`, `Q5`, `Q6`, `Q7` |
+| S5 | `E1`, `E2`, `E3_ratio`, `E3_outage`, `E4`, `R1` |
 
 A censored value is written with a leading `>`, for example `>149943.90895799999`.
 An empty cell means the metric could not be computed. `U2_text` is the version of
@@ -514,9 +518,9 @@ is not checked.
 |---|---|
 | `NOT_CONVERGED` | P1 is reported and v1 is still served at the end of `H`, or v2 never appeared. In S4: Q1 is censored, a version other than the last is served in the last 10 s of the run |
 | `REGRESSION` | A pod answered an earlier version after a later one (C3 above 0) |
-| `FAILED_REQUESTS` | A request failed in `H` (S1) or anywhere after the baseline (S2, S3, S4) |
+| `FAILED_REQUESTS` | A request failed in `H` (S1) or anywhere after the baseline (S2, S3, S4, S5) |
 | `LOW_RESOLUTION` | A pod went unobserved for more than 1 000 ms after the baseline |
-| `NOT_RECOVERED` | R1 is censored (S2) |
+| `NOT_RECOVERED` | R1 is censored (S2, S5) |
 | `LOST_UPDATE` | U4 is censored (S3) |
 | `UNCONFIGURED` | A pod answered the `unconfiguredVersion` after the baseline |
 | `TRIGGER_FAILED` | A `trigger` failed or timed out between `infraDown` and `infraUp` (S3) |

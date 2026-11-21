@@ -1,0 +1,8 @@
+{
+  "name": "s5",
+  "protocol": "protocol/protocol-v1.json",
+  "scenario": "scenarios/s5-bad-config-restart.json",
+  "validRuns": 10,
+  "maxBlocks": 25,
+  "seed": 20261115
+}

@@ -925,6 +925,31 @@ class EvaluatorTest {
     }
 
     @Test
+    void s5_reports_the_s2_metrics_and_a_step_between_the_commits_does_not_move_the_fix() throws Exception {
+        Scenario s5Scenario = Scenario.read(Fixtures.ROOT.resolve("scenarios/s5-bad-config-restart.json"));
+        List<ApproachDescriptor> approaches = new ArrayList<>();
+        for (String approach : Fixtures.protocol().approaches()) {
+            approaches.add(ApproachDescriptor.read(Fixtures.ROOT.resolve(approach)));
+        }
+        Evaluator s5 = new Evaluator(Fixtures.protocol(), s5Scenario, approaches);
+        List<Observation> observations = s2Observations(false);
+        RunRecord record = TestRuns.run("run-s5", "way-b", "s5-bad-config-restart", 1, 1, 1, List.of(
+                        commit(0, 0, new Payload("v2", "abc"), 90_000, 90_100),
+                        step(1, 60, Scenario.Action.DELETE_READY_POD, 150_000, 150_300),
+                        commit(2, 120, new Payload("v3", "1000"), 210_000, 210_080)),
+                observations, samples(0, 360_000), 360_000);
+
+        RunMetrics metrics = s5.evaluate(record);
+        RunMetrics asS2 = s2.evaluate(s2Run(observations));
+
+        assertEquals(List.of("E1", "E2", "E3_ratio", "E3_outage", "E4", "R1"), Evaluator.columns(s5Scenario));
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(asS2.metrics(), metrics.metrics());
+        assertEquals(asS2.flags(), metrics.flags());
+        assertEquals(new Metric(MetricId.R1, "R1", 360_000.0 - 210_080, true, null), metric(metrics, "R1"));
+    }
+
+    @Test
     void s4_reports_Q1_to_Q7_and_the_hand_calculated_values_of_two_overlapping_changes() {
         RunMetrics metrics = s4.evaluate(s4Run(s4Overlapping()));
 
