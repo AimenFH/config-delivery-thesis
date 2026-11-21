@@ -1,0 +1,74 @@
+{
+  "gitCommit" : "7466f59602084cff69b745a2bd6063690f5a5c00",
+  "gitDirty" : false,
+  "kubernetesClientVersion" : "v1.36.1",
+  "kubernetesServerVersion" : "v1.37.0",
+  "nodeCount" : 4,
+  "workloadImages" : [ {
+    "namespace" : "thesis",
+    "pod" : "probe-service-555ff944c6-h95ns",
+    "container" : "probe",
+    "image" : "docker.io/library/probe-service:0.2.0",
+    "imageId" : "docker.io/library/import-2026-11-15@sha256:6dc120eb979dcaac8033a587668d056985c56c47ad3cc1c71bb0c6597aeebb22"
+  }, {
+    "namespace" : "thesis",
+    "pod" : "probe-service-555ff944c6-pdwlk",
+    "container" : "probe",
+    "image" : "docker.io/library/probe-service:0.2.0",
+    "imageId" : "docker.io/library/import-2026-11-15@sha256:6dc120eb979dcaac8033a587668d056985c56c47ad3cc1c71bb0c6597aeebb22"
+  }, {
+    "namespace" : "thesis",
+    "pod" : "probe-service-555ff944c6-vxth6",
+    "container" : "probe",
+    "image" : "docker.io/library/probe-service:0.2.0",
+    "imageId" : "docker.io/library/import-2026-11-15@sha256:6dc120eb979dcaac8033a587668d056985c56c47ad3cc1c71bb0c6597aeebb22"
+  } ],
+  "infrastructureImages" : [ {
+    "namespace" : "platform",
+    "pod" : "argocd-application-controller-6cc6f8cbbd-vfr6r",
+    "container" : "argocd-application-controller",
+    "image" : "quay.io/argoproj/argocd:v3.5.8",
+    "imageId" : "quay.io/argoproj/argocd@sha256:94ba7d959d8228e40dfb0cbcdde0464cde632f9b517128154fae73c6e1c76554"
+  }, {
+    "namespace" : "platform",
+    "pod" : "argocd-redis-585d84f856-jrggf",
+    "container" : "redis",
+    "image" : "public.ecr.aws/docker/library/redis:8.2.3-alpine",
+    "imageId" : "public.ecr.aws/docker/library/redis@sha256:08ad0b1d280850169a790dba1393ff7a90aef951fc19632cf4d3ce4f78e679ba"
+  }, {
+    "namespace" : "platform",
+    "pod" : "argocd-repo-server-6d977d7f78-h2c9c",
+    "container" : "argocd-repo-server",
+    "image" : "quay.io/argoproj/argocd:v3.5.8",
+    "imageId" : "quay.io/argoproj/argocd@sha256:94ba7d959d8228e40dfb0cbcdde0464cde632f9b517128154fae73c6e1c76554"
+  }, {
+    "namespace" : "platform",
+    "pod" : "config-server-85b9fbd86-cgv9x",
+    "container" : "config-server",
+    "image" : "docker.io/library/config-server:0.1.0",
+    "imageId" : "docker.io/library/import-2026-11-07@sha256:2915cdf84c95f463dacc84ef416012635f8e3f90180b7850eaec238ba076e083"
+  }, {
+    "namespace" : "platform",
+    "pod" : "config-watcher-5b57946567-5h2p6",
+    "container" : "watcher",
+    "image" : "docker.io/springcloud/spring-cloud-kubernetes-configuration-watcher:3.1.6",
+    "imageId" : "sha256:1733d1b4fc28e826f094965d83dd15161b0d0f7ab3a8b245016c303535fdecf9"
+  }, {
+    "namespace" : "platform",
+    "pod" : "rabbitmq-6645d96f68-96shn",
+    "container" : "rabbitmq",
+    "image" : "docker.io/library/rabbitmq:3.13",
+    "imageId" : "docker.io/library/rabbitmq@sha256:87178a0ee3e2f52980ba356d38646ed1056705ff2d5ff281f8965456eaa0c1e3"
+  }, {
+    "namespace" : "platform",
+    "pod" : "reloader-reloader-66dc5fd45f-zjvkl",
+    "container" : "reloader-reloader",
+    "image" : "ghcr.io/stakater/reloader:v1.4.22",
+    "imageId" : "ghcr.io/stakater/reloader@sha256:def2480040adc164b3a57340e77674eadfd88fb7f0593df25e93297f29c7fd7c"
+  } ],
+  "javaVersion" : "openjdk version \"27.0.1.1\" 2026-11-17\nOpenJDK Runtime Environment (build 27.0.1.1+4-22)\nOpenJDK 64-Bit Server VM (build 27.0.1.1+4-22, mixed mode, sharing)",
+  "os" : "Darwin 27.2.0",
+  "machine" : "arm64",
+  "dockerCpus" : 10,
+  "dockerMemoryBytes" : 8319504384
+}

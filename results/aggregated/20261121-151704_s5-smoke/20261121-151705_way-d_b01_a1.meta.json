@@ -1,0 +1,81 @@
+{
+  "runId" : "20261121-151705_way-d_b01_a1",
+  "campaign" : "20261121-151704_s5-smoke",
+  "approach" : "way-d",
+  "scenario" : "s5-bad-config-restart",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 1,
+  "attempt" : 1,
+  "runStartedAt" : "2026-11-21T14:19:47.639Z",
+  "runStartedAtEpochMillis" : 1795270787639,
+  "gate" : true,
+  "loadStartedAt" : 2.565625,
+  "runEndAt" : 360006.26916699996,
+  "scheduled" : 18001,
+  "sourceCheck" : {
+    "command" : "bash -c git -C \"${CONFIG_REPO_WAY_D:-$HOME/config-repo-way-d}\" ls-remote -q --exit-code origin refs/heads/way-d",
+    "startedAt" : -156007.871,
+    "finishedAt" : -155535.79450000002,
+    "exitCode" : 0,
+    "output" : "73bea41a6363c18c2c39765bfa8492b2bd5fd3c0\trefs/heads/way-d"
+  },
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "abc"
+    },
+    "startedAt" : 90012.622708,
+    "finishedAt" : 91988.498958,
+    "exitCode" : 0,
+    "output" : "pushed v2 with timeoutMs abc to way-d",
+    "trigger" : {
+      "command" : "kubectl -n platform annotate application way-d argocd.argoproj.io/refresh=normal --overwrite",
+      "startedAt" : 91988.971458,
+      "finishedAt" : 92036.303292,
+      "exitCode" : 0,
+      "output" : "application.argoproj.io/way-d annotated"
+    },
+    "detail" : null
+  }, {
+    "index" : 1,
+    "atSeconds" : 60,
+    "action" : "deleteReadyPod",
+    "payload" : null,
+    "startedAt" : 150005.729292,
+    "finishedAt" : 150103.784292,
+    "exitCode" : 0,
+    "output" : "pod \"probe-service-cb7dfdc78-4sq7c\" deleted from thesis namespace",
+    "trigger" : null,
+    "detail" : "probe-service-cb7dfdc78-4sq7c"
+  }, {
+    "index" : 2,
+    "atSeconds" : 120,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v3",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 210006.269167,
+    "finishedAt" : 213108.344042,
+    "exitCode" : 0,
+    "output" : "pushed v3 with timeoutMs 1000 to way-d",
+    "trigger" : {
+      "command" : "kubectl -n platform annotate application way-d argocd.argoproj.io/refresh=normal --overwrite",
+      "startedAt" : 213108.781583,
+      "finishedAt" : 213150.049625,
+      "exitCode" : 0,
+      "output" : "application.argoproj.io/way-d annotated"
+    },
+    "detail" : null
+  } ],
+  "errors" : [ ],
+  "tCs" : 90012.622708,
+  "t0" : 91988.498958,
+  "verdict" : "VALID",
+  "invalidReasons" : [ ],
+  "flags" : [ ]
+}

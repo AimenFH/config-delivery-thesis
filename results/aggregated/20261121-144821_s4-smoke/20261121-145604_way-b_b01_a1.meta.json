@@ -1,0 +1,52 @@
+{
+  "runId" : "20261121-145604_way-b_b01_a1",
+  "campaign" : "20261121-144821_s4-smoke",
+  "approach" : "way-b",
+  "scenario" : "s4-rapid-changes",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 2,
+  "attempt" : 1,
+  "runStartedAt" : "2026-11-21T13:58:52.643Z",
+  "runStartedAtEpochMillis" : 1795269532643,
+  "gate" : false,
+  "loadStartedAt" : 0.392834,
+  "runEndAt" : 250003.618334,
+  "scheduled" : 12501,
+  "sourceCheck" : null,
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 90002.362334,
+    "finishedAt" : 90058.373042,
+    "exitCode" : 0,
+    "output" : "configmap/demo-config patched",
+    "trigger" : null,
+    "detail" : null
+  }, {
+    "index" : 1,
+    "atSeconds" : 10,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v3",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 100003.618334,
+    "finishedAt" : 100065.938042,
+    "exitCode" : 0,
+    "output" : "configmap/demo-config patched",
+    "trigger" : null,
+    "detail" : null
+  } ],
+  "errors" : [ ],
+  "tCs" : 90002.362334,
+  "t0" : 90058.373042,
+  "verdict" : "VALID",
+  "invalidReasons" : [ ],
+  "flags" : [ ]
+}

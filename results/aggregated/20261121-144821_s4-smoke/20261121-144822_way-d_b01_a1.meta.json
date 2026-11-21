@@ -1,0 +1,70 @@
+{
+  "runId" : "20261121-144822_way-d_b01_a1",
+  "campaign" : "20261121-144821_s4-smoke",
+  "approach" : "way-d",
+  "scenario" : "s4-rapid-changes",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 1,
+  "attempt" : 1,
+  "runStartedAt" : "2026-11-21T13:51:53.714Z",
+  "runStartedAtEpochMillis" : 1795269113714,
+  "gate" : false,
+  "loadStartedAt" : 4.206292,
+  "runEndAt" : 250000.497167,
+  "scheduled" : 12501,
+  "sourceCheck" : {
+    "command" : "bash -c git -C \"${CONFIG_REPO_WAY_D:-$HOME/config-repo-way-d}\" ls-remote -q --exit-code origin refs/heads/way-d",
+    "startedAt" : -176273.893458,
+    "finishedAt" : -175762.84075,
+    "exitCode" : 0,
+    "output" : "89f9d0667b3b70a34b3bda764eecb188042bb582\trefs/heads/way-d"
+  },
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 90004.401,
+    "finishedAt" : 91958.1815,
+    "exitCode" : 0,
+    "output" : "pushed v2 with timeoutMs 1000 to way-d",
+    "trigger" : {
+      "command" : "kubectl -n platform annotate application way-d argocd.argoproj.io/refresh=normal --overwrite",
+      "startedAt" : 91958.686084,
+      "finishedAt" : 92004.676042,
+      "exitCode" : 0,
+      "output" : "application.argoproj.io/way-d annotated"
+    },
+    "detail" : null
+  }, {
+    "index" : 1,
+    "atSeconds" : 10,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v3",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 100000.497167,
+    "finishedAt" : 101794.678542,
+    "exitCode" : 0,
+    "output" : "pushed v3 with timeoutMs 1000 to way-d",
+    "trigger" : {
+      "command" : "kubectl -n platform annotate application way-d argocd.argoproj.io/refresh=normal --overwrite",
+      "startedAt" : 101795.0835,
+      "finishedAt" : 101836.891334,
+      "exitCode" : 0,
+      "output" : "application.argoproj.io/way-d annotated"
+    },
+    "detail" : null
+  } ],
+  "errors" : [ ],
+  "tCs" : 90004.401,
+  "t0" : 91958.1815,
+  "verdict" : "VALID",
+  "invalidReasons" : [ ],
+  "flags" : [ ]
+}

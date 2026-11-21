@@ -1,0 +1,63 @@
+{
+  "runId" : "20261121-152548_way-b_b01_a1",
+  "campaign" : "20261121-151704_s5-smoke",
+  "approach" : "way-b",
+  "scenario" : "s5-bad-config-restart",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 2,
+  "attempt" : 1,
+  "runStartedAt" : "2026-11-21T14:28:31.972Z",
+  "runStartedAtEpochMillis" : 1795271311972,
+  "gate" : true,
+  "loadStartedAt" : 0.449667,
+  "runEndAt" : 360003.064792,
+  "scheduled" : 18001,
+  "sourceCheck" : null,
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "abc"
+    },
+    "startedAt" : 90007.374417,
+    "finishedAt" : 90065.672292,
+    "exitCode" : 0,
+    "output" : "configmap/demo-config patched",
+    "trigger" : null,
+    "detail" : null
+  }, {
+    "index" : 1,
+    "atSeconds" : 60,
+    "action" : "deleteReadyPod",
+    "payload" : null,
+    "startedAt" : 150003.097875,
+    "finishedAt" : 150100.946959,
+    "exitCode" : 0,
+    "output" : "pod \"probe-service-784f7b9d4c-72z9v\" deleted from thesis namespace",
+    "trigger" : null,
+    "detail" : "probe-service-784f7b9d4c-72z9v"
+  }, {
+    "index" : 2,
+    "atSeconds" : 120,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v3",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 210003.064792,
+    "finishedAt" : 210067.224459,
+    "exitCode" : 0,
+    "output" : "configmap/demo-config patched",
+    "trigger" : null,
+    "detail" : null
+  } ],
+  "errors" : [ ],
+  "tCs" : 90007.374417,
+  "t0" : 90065.672292,
+  "verdict" : "VALID",
+  "invalidReasons" : [ ],
+  "flags" : [ "FAILED_REQUESTS", "NOT_RECOVERED" ]
+}

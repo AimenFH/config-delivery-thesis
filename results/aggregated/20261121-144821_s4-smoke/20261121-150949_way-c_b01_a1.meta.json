@@ -1,0 +1,70 @@
+{
+  "runId" : "20261121-150949_way-c_b01_a1",
+  "campaign" : "20261121-144821_s4-smoke",
+  "approach" : "way-c",
+  "scenario" : "s4-rapid-changes",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 4,
+  "attempt" : 1,
+  "runStartedAt" : "2026-11-21T14:12:43.309Z",
+  "runStartedAtEpochMillis" : 1795270363309,
+  "gate" : false,
+  "loadStartedAt" : 0.461417,
+  "runEndAt" : 250010.899792,
+  "scheduled" : 12501,
+  "sourceCheck" : {
+    "command" : "bash -c git -C \"${CONFIG_REPO:-$HOME/config-repo}\" ls-remote -q origin HEAD",
+    "startedAt" : -166025.95737500003,
+    "finishedAt" : -165438.46541600002,
+    "exitCode" : 0,
+    "output" : "19975d42dfbdb18df81d6f1a7e26fb1e0ffe3106\tHEAD"
+  },
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 90001.111417,
+    "finishedAt" : 91823.652792,
+    "exitCode" : 0,
+    "output" : "pushed v2 with timeoutMs 1000",
+    "trigger" : {
+      "command" : "kubectl -n platform exec deploy/config-server -- curl -sf -X POST localhost:8888/actuator/busrefresh",
+      "startedAt" : 91824.013708,
+      "finishedAt" : 94503.367333,
+      "exitCode" : 0,
+      "output" : ""
+    },
+    "detail" : null
+  }, {
+    "index" : 1,
+    "atSeconds" : 10,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v3",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 100010.899792,
+    "finishedAt" : 101930.032875,
+    "exitCode" : 0,
+    "output" : "pushed v3 with timeoutMs 1000",
+    "trigger" : {
+      "command" : "kubectl -n platform exec deploy/config-server -- curl -sf -X POST localhost:8888/actuator/busrefresh",
+      "startedAt" : 101930.441417,
+      "finishedAt" : 103942.543292,
+      "exitCode" : 0,
+      "output" : ""
+    },
+    "detail" : null
+  } ],
+  "errors" : [ ],
+  "tCs" : 90001.111417,
+  "t0" : 91823.652792,
+  "verdict" : "VALID",
+  "invalidReasons" : [ ],
+  "flags" : [ ]
+}

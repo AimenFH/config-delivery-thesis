@@ -150,6 +150,14 @@ caffeinate -dims java -jar tools/experiment-runner/target/experiment-runner.jar 
 caffeinate -dims java -jar tools/experiment-runner/target/experiment-runner.jar --campaign campaigns/s3-smoke.json
 ```
 
+```bash
+caffeinate -dims java -jar tools/experiment-runner/target/experiment-runner.jar --campaign campaigns/s4-smoke.json
+```
+
+```bash
+caffeinate -dims java -jar tools/experiment-runner/target/experiment-runner.jar --campaign campaigns/s5-smoke.json
+```
+
 Run them one after the other, never two at once. `caffeinate` keeps macOS awake.
 
 | Campaign | Runs when all are valid | Time on 2026-11-15 |
@@ -157,6 +165,16 @@ Run them one after the other, never two at once. `caffeinate` keeps macOS awake.
 | `s1-smoke` | 6 (2 blocks of 3) | 15:57 to 16:38 |
 | `s2-smoke` | 3 (1 block) | 16:38 to 17:05 |
 | `s3-smoke` | 3 (1 block), 5 with the repeats of Way C | 17:05 to 17:49 |
+
+S4 and S5 came later and ran with four approaches:
+
+| Campaign | Runs when all are valid | Time on 2026-11-21 |
+|---|---|---|
+| `s4-smoke` | 4 (1 block) | 14:48 to 15:17 |
+| `s5-smoke` | 4 (1 block) | 15:17 to 15:52 |
+
+What they showed is in
+[journal entry 11](journal/11-scenarios-from-incident-reports.md#what-the-smoke-campaigns-showed).
 
 The output of the three smoke campaigns of 2026-11-15, built from their result
 files. The runner prints one line per run, when the run is over.

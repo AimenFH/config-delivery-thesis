@@ -1,0 +1,25 @@
+{
+  "name" : "way-d",
+  "title" : "GitOps with Argo CD and Helm",
+  "manifests" : [ "deploy/way-d-gitops" ],
+  "reset" : [ "bash", "tools/way-d-reset.sh", "{initialVersion}", "{initialTimeoutMs}" ],
+  "commit" : [ "bash", "tools/way-d-commit.sh", "{version}", "{timeoutMs}" ],
+  "trigger" : [ "kubectl", "-n", "platform", "annotate", "application", "way-d", "argocd.argoproj.io/refresh=normal", "--overwrite" ],
+  "sourceCheck" : [ "bash", "-c", "git -C \"${CONFIG_REPO_WAY_D:-$HOME/config-repo-way-d}\" ls-remote -q --exit-code origin refs/heads/way-d" ],
+  "infrastructure" : [ {
+    "namespace" : "platform",
+    "deployment" : "argocd-application-controller"
+  }, {
+    "namespace" : "platform",
+    "deployment" : "argocd-repo-server"
+  }, {
+    "namespace" : "platform",
+    "deployment" : "argocd-redis"
+  } ],
+  "declared" : {
+    "extraComponents" : [ "Argo CD application controller", "Argo CD repo server", "Redis" ],
+    "operatorActionsPerChange" : 2,
+    "clusterWideRbac" : true,
+    "serviceCoupling" : "none, values read at process start"
+  }
+}

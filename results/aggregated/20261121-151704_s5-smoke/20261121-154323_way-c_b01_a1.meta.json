@@ -1,0 +1,81 @@
+{
+  "runId" : "20261121-154323_way-c_b01_a1",
+  "campaign" : "20261121-151704_s5-smoke",
+  "approach" : "way-c",
+  "scenario" : "s5-bad-config-restart",
+  "protocolVersion" : 1,
+  "block" : 1,
+  "positionInBlock" : 4,
+  "attempt" : 1,
+  "runStartedAt" : "2026-11-21T14:46:26.726Z",
+  "runStartedAtEpochMillis" : 1795272386726,
+  "gate" : true,
+  "loadStartedAt" : 0.498667,
+  "runEndAt" : 360000.927834,
+  "scheduled" : 18000,
+  "sourceCheck" : {
+    "command" : "bash -c git -C \"${CONFIG_REPO:-$HOME/config-repo}\" ls-remote -q origin HEAD",
+    "startedAt" : -174546.564333,
+    "finishedAt" : -173986.245375,
+    "exitCode" : 0,
+    "output" : "4f413663251e4f00205b5902924ea44539465942\tHEAD"
+  },
+  "steps" : [ {
+    "index" : 0,
+    "atSeconds" : 0,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v2",
+      "timeoutMs" : "abc"
+    },
+    "startedAt" : 90003.643,
+    "finishedAt" : 91865.951042,
+    "exitCode" : 0,
+    "output" : "pushed v2 with timeoutMs abc",
+    "trigger" : {
+      "command" : "kubectl -n platform exec deploy/config-server -- curl -sf -X POST localhost:8888/actuator/busrefresh",
+      "startedAt" : 91866.325042,
+      "finishedAt" : 93108.69675,
+      "exitCode" : 0,
+      "output" : ""
+    },
+    "detail" : null
+  }, {
+    "index" : 1,
+    "atSeconds" : 60,
+    "action" : "deleteReadyPod",
+    "payload" : null,
+    "startedAt" : 150000.430834,
+    "finishedAt" : 150133.703584,
+    "exitCode" : 0,
+    "output" : "pod \"probe-service-d54c547db-6wzfz\" deleted from thesis namespace",
+    "trigger" : null,
+    "detail" : "probe-service-d54c547db-6wzfz"
+  }, {
+    "index" : 2,
+    "atSeconds" : 120,
+    "action" : "commit",
+    "payload" : {
+      "configVersion" : "v3",
+      "timeoutMs" : "1000"
+    },
+    "startedAt" : 210000.927834,
+    "finishedAt" : 211916.857375,
+    "exitCode" : 0,
+    "output" : "pushed v3 with timeoutMs 1000",
+    "trigger" : {
+      "command" : "kubectl -n platform exec deploy/config-server -- curl -sf -X POST localhost:8888/actuator/busrefresh",
+      "startedAt" : 211917.37,
+      "finishedAt" : 214250.184417,
+      "exitCode" : 0,
+      "output" : ""
+    },
+    "detail" : null
+  } ],
+  "errors" : [ ],
+  "tCs" : 90003.643,
+  "t0" : 91865.951042,
+  "verdict" : "VALID",
+  "invalidReasons" : [ ],
+  "flags" : [ "FAILED_REQUESTS", "LOW_RESOLUTION" ]
+}
