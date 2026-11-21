@@ -1,0 +1,8 @@
+{
+  "name": "s4",
+  "protocol": "protocol/protocol-v1.json",
+  "scenario": "scenarios/s4-rapid-changes.json",
+  "validRuns": 10,
+  "maxBlocks": 25,
+  "seed": 20261115
+}

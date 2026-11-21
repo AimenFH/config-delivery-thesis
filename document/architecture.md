@@ -79,7 +79,7 @@ The diagram is the one of the plan.
 flowchart TB
     subgraph core["Fixed core, protocol version 1: identical for every approach"]
         protocol["protocol file<br/>every constant"]
-        scen["scenario files<br/>S1 valid change, S2 invalid configuration, S3 outage"]
+        scen["scenario files<br/>S1 valid change, S2 invalid configuration, S3 outage, S4 rapid changes"]
         campaign["Campaign<br/>randomized blocks, fresh deployment, retries"]
         steps["Step executor<br/>commit, infraDown, infraUp, deletePod"]
         inv["InvariantCheck<br/>same workload and gate setting for all"]
@@ -227,7 +227,7 @@ Everything after `T0` is delivery time, whether a controller reacts or a trigger
 is called. Way C's `busrefresh` call therefore counts, as the reaction times of
 Reloader and the Watcher do.
 
-## The three scenarios
+## The four scenarios
 
 A scenario is a file in `scenarios/` with timed steps. The steps and offsets are
 the same for every approach, and the core executes them.
@@ -237,9 +237,10 @@ the same for every approach, and the core executes them.
 | S1 valid change | The five criteria | off | 0 s commit v2 with `timeoutMs` 1000 | 240 s | P1 to O5 |
 | S2 invalid configuration | Does a bad configuration reach traffic, what does it cost, how fast does the fix arrive | on | 0 s commit v2 with `timeoutMs` `abc`. 120 s commit v3 with `timeoutMs` 1000 | 360 s | E1 to E4, R1 |
 | S3 infrastructure outage | What happens to a change and to a restarted pod while the delivery components are down | off | 0 s `infraDown`. 30 s commit v2. 60 s `deletePod`. 120 s `infraUp` | 360 s | U1 to U5 |
+| S4 rapid successive changes | Do all replicas end on the last version when a second change follows 10 s after the first, and which versions are served in between | off | 0 s commit v2. 10 s commit v3, both with `timeoutMs` 1000 | 250 s | Q1 to Q7 |
 
-The load runs for 150 s after the start of the last step, which gives 240 s in S1
-and 360 s in S2 and S3.
+The load runs for 150 s after the start of the last step, which gives 240 s in S1,
+360 s in S2 and S3, and 250 s in S4.
 
 Every payload has its own version. The version in an answer therefore tells which
 payload the answering pod runs, and the runner sees an invalid configuration from
@@ -254,7 +255,13 @@ In S3 `infraDown` scales the infrastructure Deployments of the approach under te
 to 0 and `infraUp` scales them back. The core restores them at the end of every
 run, also after an error, and the next run starts only when they are ready.
 
-The five criteria and all metric definitions are in the
+S4 was added on 2026-11-21, after the plan was frozen. The steps of a scenario
+run one after the other, so a commit that takes longer than 10 s pushes the
+second commit back. Q7 records the real gap. The reasons for the scenario, the
+incident reports behind it and the definitions of Q1 to Q7 are in the
+[decision entry](../docs/DECISIONS.md#2026-11-21-s4-commits-two-valid-changes-10-seconds-apart).
+
+The five criteria and the metric definitions of S1 to S3 are in the
 [plan](../docs/experiment-plan.md#the-five-criteria). A worked example for every
 metric is in the [code walkthrough](code-walkthrough.md#the-metrics). What the
 approaches did in the smoke runs is in

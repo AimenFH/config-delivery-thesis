@@ -13,14 +13,15 @@ class MetricIdTest {
     @Test
     void theRegistryHoldsEveryMetricIdOfThePlan() {
         assertEquals(List.of("P1", "P2", "P3", "C1", "C2", "C3", "A1", "A2", "A3", "F1", "F2", "F3",
-                        "O1", "O2", "O3", "O4", "O5", "E1", "E2", "E3", "E4", "R1", "U1", "U2", "U3", "U4", "U5"),
+                        "O1", "O2", "O3", "O4", "O5", "E1", "E2", "E3", "E4", "R1", "U1", "U2", "U3", "U4", "U5",
+                        "Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"),
                 Arrays.stream(MetricId.values()).map(Enum::name).toList());
     }
 
     @Test
     void thePrimaryMetricsAreThoseThePlanMarks() {
         assertEquals(EnumSet.of(MetricId.P1, MetricId.C1, MetricId.A1, MetricId.F1, MetricId.O1, MetricId.O2,
-                        MetricId.E1, MetricId.E2, MetricId.R1, MetricId.U3, MetricId.U4),
+                        MetricId.E1, MetricId.E2, MetricId.R1, MetricId.U3, MetricId.U4, MetricId.Q1, MetricId.Q2),
                 EnumSet.copyOf(Arrays.stream(MetricId.values()).filter(MetricId::primary).toList()));
     }
 
@@ -34,7 +35,8 @@ class MetricIdTest {
                 case 'F' -> "Performance impact";
                 case 'O' -> "Operational overhead";
                 case 'E', 'R' -> "S2 invalid configuration";
-                default -> "S3 infrastructure outage";
+                case 'U' -> "S3 infrastructure outage";
+                default -> "S4 rapid successive changes";
             };
             assertEquals(expected, id.criterion(), id.name());
         }
@@ -52,7 +54,10 @@ class MetricIdTest {
                         "Availability under the bad configuration|ratio, ms", "Lowest serving replicas|count",
                         "Recovery time|ms",
                         "Delivery during the outage|count", "Replacement pod|ms, version", "Mixed-version time|ms",
-                        "Catch-up time|ms", "Failed-request ratio|ratio"),
+                        "Catch-up time|ms", "Failed-request ratio|ratio",
+                        "Final convergence time|ms", "Mixed-version time|ms", "Most versions at once|count",
+                        "Intermediate version exposure|count", "Pod regressions|count",
+                        "Failed-request ratio|ratio", "Commit gap|ms"),
                 Arrays.stream(MetricId.values()).map(id -> id.title() + "|" + id.unit()).toList());
     }
 }

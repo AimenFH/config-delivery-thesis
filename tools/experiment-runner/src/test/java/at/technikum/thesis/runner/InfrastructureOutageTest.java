@@ -127,6 +127,37 @@ class InfrastructureOutageTest {
     }
 
     @Test
+    void the_most_versions_at_once_is_the_highest_number_of_versions_served_at_the_same_time() {
+        List<Observation> observations = List.of(
+                seen(100, 100, "a", "v1"), seen(400, 400, "a", "v1"),
+                seen(200, 200, "b", "v2"), seen(500, 500, "b", "v2"),
+                seen(300, 300, "c", "v3"), seen(600, 600, "c", "v3"));
+
+        assertEquals(3, InfrastructureOutage.mostVersionsAtOnce(observations, R));
+        assertEquals(500 - 200, InfrastructureOutage.mixedVersionMillis(observations, R));
+    }
+
+    @Test
+    void the_most_versions_at_once_is_one_for_a_single_version_and_zero_without_answers() {
+        List<Observation> observations = List.of(
+                seen(100, 100, "a", "v1"), seen(200, 200, "a", "v1"),
+                seen(150, 150, "b", "v1"), seen(250, 250, "b", "v1"));
+
+        assertEquals(1, InfrastructureOutage.mostVersionsAtOnce(observations, R));
+        assertEquals(0, InfrastructureOutage.mostVersionsAtOnce(List.of(), R));
+    }
+
+    @Test
+    void two_versions_that_only_meet_in_one_instant_do_not_count_as_served_at_the_same_time() {
+        List<Observation> observations = List.of(
+                seen(200, 200, "a", "v2"), seen(300, 300, "a", "v2"),
+                seen(100, 100, "b", "v1"), seen(200, 200, "b", "v1"));
+
+        assertEquals(1, InfrastructureOutage.mostVersionsAtOnce(observations, R));
+        assertEquals(0, InfrastructureOutage.mixedVersionMillis(observations, R));
+    }
+
+    @Test
     void u4_runs_from_the_end_of_infra_up_to_convergence_on_v2() {
         WindowDetector.Window window = new WindowDetector.Window(6_800.0, 7_300.0, 500.0, 700.0);
 

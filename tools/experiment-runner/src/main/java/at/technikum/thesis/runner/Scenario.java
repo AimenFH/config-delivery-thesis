@@ -126,6 +126,9 @@ public record Scenario(
         if (!invalidVersions.isEmpty()) {
             return EnumSet.range(MetricId.E1, MetricId.R1);
         }
+        if (payloads().size() > 1) {
+            return EnumSet.range(MetricId.Q1, MetricId.Q7);
+        }
         return EnumSet.range(MetricId.P1, MetricId.O5);
     }
 }

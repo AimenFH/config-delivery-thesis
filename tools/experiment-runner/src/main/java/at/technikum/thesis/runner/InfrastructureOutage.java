@@ -15,6 +15,9 @@ final class InfrastructureOutage {
     private record Edge(double at, String version, int change) {
     }
 
+    private record Overlap(double mixedMillis, int mostVersions) {
+    }
+
     private InfrastructureOutage() {
     }
 
@@ -47,6 +50,14 @@ final class InfrastructureOutage {
     }
 
     static double mixedVersionMillis(List<Observation> observations, Interval interval) {
+        return overlap(observations, interval).mixedMillis();
+    }
+
+    static int mostVersionsAtOnce(List<Observation> observations, Interval interval) {
+        return overlap(observations, interval).mostVersions();
+    }
+
+    private static Overlap overlap(List<Observation> observations, Interval interval) {
         Map<String, List<Observation>> byPod = Availability.answers(observations, interval).stream()
                 .collect(Collectors.groupingBy(Observation::pod, TreeMap::new, Collectors.toList()));
         List<Edge> edges = new ArrayList<>();
@@ -63,9 +74,13 @@ final class InfrastructureOutage {
         edges.sort(Comparator.comparingDouble(Edge::at));
         Map<String, Integer> serving = new HashMap<>();
         int versions = 0;
+        int most = 0;
         double total = 0;
         double previousAt = 0;
         for (Edge edge : edges) {
+            if (edge.at() > previousAt) {
+                most = Math.max(most, versions);
+            }
             if (versions >= 2) {
                 total += edge.at() - previousAt;
             }
@@ -79,7 +94,7 @@ final class InfrastructureOutage {
             }
             previousAt = edge.at();
         }
-        return total;
+        return new Overlap(total, most);
     }
 
     static Metric catchUp(WindowDetector.Window window, boolean stillServed, Double infraUpFinishedAt,

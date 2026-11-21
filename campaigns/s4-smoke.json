@@ -1,0 +1,8 @@
+{
+  "name": "s4-smoke",
+  "protocol": "protocol/protocol-v1.json",
+  "scenario": "scenarios/s4-rapid-changes.json",
+  "validRuns": 1,
+  "maxBlocks": 1,
+  "seed": 20261115
+}

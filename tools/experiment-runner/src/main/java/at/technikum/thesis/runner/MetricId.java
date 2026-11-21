@@ -28,7 +28,14 @@ public enum MetricId {
     U2("S3 infrastructure outage", "Replacement pod", "ms, version", false),
     U3("S3 infrastructure outage", "Mixed-version time", "ms", true),
     U4("S3 infrastructure outage", "Catch-up time", "ms", true),
-    U5("S3 infrastructure outage", "Failed-request ratio", "ratio", false);
+    U5("S3 infrastructure outage", "Failed-request ratio", "ratio", false),
+    Q1("S4 rapid successive changes", "Final convergence time", "ms", true),
+    Q2("S4 rapid successive changes", "Mixed-version time", "ms", true),
+    Q3("S4 rapid successive changes", "Most versions at once", "count", false),
+    Q4("S4 rapid successive changes", "Intermediate version exposure", "count", false),
+    Q5("S4 rapid successive changes", "Pod regressions", "count", false),
+    Q6("S4 rapid successive changes", "Failed-request ratio", "ratio", false),
+    Q7("S4 rapid successive changes", "Commit gap", "ms", false);
 
     private final String criterion;
     private final String title;

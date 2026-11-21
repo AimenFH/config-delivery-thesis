@@ -45,6 +45,7 @@ public final class Evaluator implements RunJudge {
             case O5 -> List.of("O5_extraComponents", "O5_operatorActions", "O5_clusterWideRbac",
                     "O5_serviceCoupling", "O5_requestedCpu", "O5_requestedMemory");
             case E3 -> List.of("E3_ratio", "E3_outage");
+            case Q4 -> List.of("Q4_pods", "Q4_requests");
             default -> List.of(id.name());
         };
     }
@@ -382,6 +383,9 @@ public final class Evaluator implements RunJudge {
             if (coverage.hasGap(observations, afterBaseline)) {
                 flags.add(RunMetrics.Flag.LOW_RESOLUTION);
             }
+            if (metrics.stream().anyMatch(metric -> metric.id() == MetricId.Q1 && metric.censored())) {
+                flags.add(RunMetrics.Flag.NOT_CONVERGED);
+            }
             if (metrics.stream().anyMatch(metric -> metric.id() == MetricId.R1 && metric.censored())) {
                 flags.add(RunMetrics.Flag.NOT_RECOVERED);
             }
@@ -439,6 +443,16 @@ public final class Evaluator implements RunJudge {
                         step(Scenario.Action.INFRA_UP) == null ? null : step(Scenario.Action.INFRA_UP).finishedAt(),
                         record.runEndAt()));
                 case U5 -> List.of(metric(id, "U5", availability.failedRatio(afterBaseline)));
+                case Q1 -> List.of(finalConvergence());
+                case Q2 -> List.of(metric(id, "Q2",
+                        InfrastructureOutage.mixedVersionMillis(observations, afterBaseline)));
+                case Q3 -> List.of(metric(id, "Q3",
+                        InfrastructureOutage.mostVersionsAtOnce(observations, afterBaseline)));
+                case Q4 -> intermediateExposure();
+                case Q5 -> List.of(metric(id, "Q5",
+                        Consistency.regressions(observations, afterBaseline, declaredVersions)));
+                case Q6 -> List.of(metric(id, "Q6", availability.failedRatio(afterBaseline)));
+                case Q7 -> List.of(SuccessiveChanges.commitGap(record.commits()));
             };
         }
 
@@ -488,6 +502,24 @@ public final class Evaluator implements RunJudge {
             return InvalidConfiguration.recovery(observations, availability, afterBaseline,
                     payloads.size() > 1 ? payloads.get(1).configVersion() : null,
                     fix == null ? null : fix.t0());
+        }
+
+        private Metric finalConvergence() {
+            List<Payload> payloads = scenario.payloads();
+            List<RunRecord.StepRecord> commits = record.commits();
+            boolean allCommitted = !payloads.isEmpty() && commits.size() == payloads.size();
+            return SuccessiveChanges.finalConvergence(observations, afterBaseline,
+                    payloads.isEmpty() ? null : payloads.get(payloads.size() - 1).configVersion(),
+                    allCommitted ? commits.get(commits.size() - 1).t0() : null);
+        }
+
+        private List<Metric> intermediateExposure() {
+            List<String> intermediate = SuccessiveChanges.intermediateVersions(scenario.payloads());
+            return List.of(
+                    metric(MetricId.Q4, "Q4_pods",
+                            InvalidConfiguration.exposedPods(observations, afterBaseline, intermediate)),
+                    metric(MetricId.Q4, "Q4_requests",
+                            InvalidConfiguration.exposedRequests(observations, afterBaseline, intermediate)));
         }
 
         private Long deliveredDuringOutage() {

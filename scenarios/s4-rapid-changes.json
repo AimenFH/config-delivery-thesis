@@ -1,0 +1,10 @@
+{
+  "name": "s4-rapid-changes",
+  "title": "S4 rapid successive changes",
+  "gate": false,
+  "invalidVersions": [],
+  "steps": [
+    {"atSeconds": 0, "action": "commit", "payload": {"configVersion": "v2", "timeoutMs": "1000"}},
+    {"atSeconds": 10, "action": "commit", "payload": {"configVersion": "v3", "timeoutMs": "1000"}}
+  ]
+}

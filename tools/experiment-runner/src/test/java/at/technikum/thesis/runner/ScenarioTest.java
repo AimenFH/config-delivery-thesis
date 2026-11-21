@@ -69,6 +69,21 @@ class ScenarioTest {
     }
 
     @Test
+    void scenarioFourCommitsTwoValidChangesTenSecondsApartWithTheGateOff() throws Exception {
+        Scenario scenario = Scenario.read(SCENARIOS.resolve("s4-rapid-changes.json"));
+
+        assertEquals("s4-rapid-changes", scenario.name());
+        assertFalse(scenario.gate());
+        assertEquals(List.of(), scenario.invalidVersions());
+        assertEquals(List.of(
+                new Scenario.Step(0, COMMIT, new Payload("v2", "1000")),
+                new Scenario.Step(10, COMMIT, new Payload("v3", "1000"))), scenario.steps());
+        assertEquals(List.of(), scenario.problems(Fixtures.protocol()));
+        assertEquals(10, scenario.lastStepAtSeconds());
+        assertEquals(List.of("v1", "v2", "v3"), List.copyOf(scenario.declaredVersions(Fixtures.protocol())));
+    }
+
+    @Test
     void theStructureOfAScenarioDecidesWhichMetricsAreReported() throws Exception {
         Set<MetricId> criteria = EnumSet.of(MetricId.P1, MetricId.P2, MetricId.P3, MetricId.C1, MetricId.C2,
                 MetricId.C3, MetricId.A1, MetricId.A2, MetricId.A3, MetricId.F1, MetricId.F2, MetricId.F3,
@@ -79,6 +94,9 @@ class ScenarioTest {
                 Scenario.read(SCENARIOS.resolve("s2-invalid-config.json")).reportedMetrics());
         assertEquals(EnumSet.of(MetricId.U1, MetricId.U2, MetricId.U3, MetricId.U4, MetricId.U5),
                 Scenario.read(SCENARIOS.resolve("s3-infra-outage.json")).reportedMetrics());
+        assertEquals(EnumSet.of(MetricId.Q1, MetricId.Q2, MetricId.Q3, MetricId.Q4, MetricId.Q5, MetricId.Q6,
+                        MetricId.Q7),
+                Scenario.read(SCENARIOS.resolve("s4-rapid-changes.json")).reportedMetrics());
     }
 
     @Test

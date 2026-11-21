@@ -35,8 +35,16 @@ class CampaignConfigTest {
     }
 
     @Test
+    void theRapidChangesCampaignNeedsTenValidRunsAndItsSmokeCampaignOneBlock() throws Exception {
+        assertEquals(new CampaignConfig("s4", "protocol/protocol-v1.json", "scenarios/s4-rapid-changes.json",
+                10, 25, 20261115L), CampaignConfig.read(CAMPAIGNS.resolve("s4.json")));
+        assertEquals(new CampaignConfig("s4-smoke", "protocol/protocol-v1.json", "scenarios/s4-rapid-changes.json",
+                1, 1, 20261115L), CampaignConfig.read(CAMPAIGNS.resolve("s4-smoke.json")));
+    }
+
+    @Test
     void everyCampaignLoadsItsProtocolScenarioAndTheFourApproaches() throws Exception {
-        for (String name : List.of("s1", "s2", "s3", "s1-smoke", "s2-smoke", "s3-smoke")) {
+        for (String name : List.of("s1", "s2", "s3", "s4", "s1-smoke", "s2-smoke", "s3-smoke", "s4-smoke")) {
             CampaignConfig config = CampaignConfig.read(CAMPAIGNS.resolve(name + ".json"));
 
             CampaignConfig.Loaded loaded = config.load(Fixtures.ROOT);

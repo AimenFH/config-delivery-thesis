@@ -46,9 +46,11 @@ class EvaluatorTest {
     private static Scenario s1Scenario;
     private static Scenario s2Scenario;
     private static Scenario s3Scenario;
+    private static Scenario s4Scenario;
     private static Evaluator s1;
     private static Evaluator s2;
     private static Evaluator s3;
+    private static Evaluator s4;
 
     @BeforeAll
     static void readTheContracts() throws Exception {
@@ -63,6 +65,8 @@ class EvaluatorTest {
         s2 = new Evaluator(protocol, s2Scenario, approaches);
         s3Scenario = Scenario.read(Fixtures.ROOT.resolve("scenarios/s3-infra-outage.json"));
         s3 = new Evaluator(protocol, s3Scenario, approaches);
+        s4Scenario = Scenario.read(Fixtures.ROOT.resolve("scenarios/s4-rapid-changes.json"));
+        s4 = new Evaluator(protocol, s4Scenario, approaches);
     }
 
     @Test
@@ -920,6 +924,111 @@ class EvaluatorTest {
                 Evaluator.row(notRecovered, s2.evaluate(notRecovered), Evaluator.columns(s2Scenario)));
     }
 
+    @Test
+    void s4_reports_Q1_to_Q7_and_the_hand_calculated_values_of_two_overlapping_changes() {
+        RunMetrics metrics = s4.evaluate(s4Run(s4Overlapping()));
+
+        assertEquals(List.of("Q1", "Q2", "Q3", "Q4_pods", "Q4_requests", "Q5", "Q6", "Q7"),
+                metrics.metrics().stream().map(Metric::column).toList());
+        assertEquals(metrics.metrics().stream().map(Metric::column).toList(), Evaluator.columns(s4Scenario));
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(Set.of(), metrics.flags());
+        assertEquals(new Metric(MetricId.Q1, "Q1", 107_962.0 - 100_080, false, null), metric(metrics, "Q1"));
+        assertEquals(107_962 - 95_042, value(metrics, "Q2"));
+        assertEquals(3, value(metrics, "Q3"));
+        assertEquals(2, value(metrics, "Q4_pods"));
+        assertEquals(166 + 167, value(metrics, "Q4_requests"));
+        assertEquals(0, value(metrics, "Q5"));
+        assertEquals(0, value(metrics, "Q6"));
+        assertEquals(100_080 - 90_100, value(metrics, "Q7"));
+    }
+
+    @Test
+    void s4_a_delivery_that_skips_the_intermediate_version_has_no_exposure_and_no_mixed_time() {
+        RunMetrics metrics = s4.evaluate(s4Run(load(0, 12_500, TestRuns.allSwitchAt(190_000, "v1", "v3"))));
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(Set.of(), metrics.flags());
+        assertEquals(189_982 - 100_080, value(metrics, "Q1"));
+        assertEquals(0, value(metrics, "Q2"));
+        assertEquals(1, value(metrics, "Q3"));
+        assertEquals(0, value(metrics, "Q4_pods"));
+        assertEquals(0, value(metrics, "Q4_requests"));
+    }
+
+    @Test
+    void s4_a_pod_that_stays_on_the_intermediate_version_sets_the_flag_NOT_CONVERGED_and_censors_q1() {
+        List<Observation> observations = load(0, 12_500, (pod, at) -> {
+            if (pod.equals(B)) {
+                return at < 98_000 ? "v1" : "v2";
+            }
+            return s4OverlappingVersion(pod, at);
+        });
+
+        RunMetrics metrics = s4.evaluate(s4Run(observations));
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(Set.of(NOT_CONVERGED), metrics.flags());
+        assertEquals(new Metric(MetricId.Q1, "Q1", 250_000.0 - 100_080, true, null), metric(metrics, "Q1"));
+        assertEquals(249_962 - 95_042, value(metrics, "Q2"));
+    }
+
+    @Test
+    void s4_a_pod_that_goes_back_from_v3_to_v2_counts_as_regressions_and_sets_both_flags() {
+        List<Observation> observations = load(0, 12_500, (pod, at) -> {
+            if (pod.equals(C)) {
+                return at < 106_000 ? "v1" : at < 110_000 ? "v3" : "v2";
+            }
+            return s4OverlappingVersion(pod, at);
+        });
+
+        RunMetrics metrics = s4.evaluate(s4Run(observations));
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(EnumSet.of(NOT_CONVERGED, REGRESSION), metrics.flags());
+        assertEquals(2_333, value(metrics, "Q5"));
+        assertEquals(3, value(metrics, "Q4_pods"));
+    }
+
+    @Test
+    void s4_q6_is_the_failed_request_ratio_over_the_whole_run_after_the_baseline() {
+        List<Observation> observations = replace(s4Overlapping(), failure(4_499 + 1), failure(9_000));
+
+        RunMetrics metrics = s4.evaluate(s4Run(observations));
+
+        assertEquals(VALID, metrics.verdict(), metrics.invalidReasons().toString());
+        assertEquals(2.0 / 8_000, value(metrics, "Q6"));
+        assertTrue(metrics.flags().contains(FAILED_REQUESTS));
+    }
+
+    @Test
+    void s4_without_the_second_commit_the_run_is_invalid_and_q1_and_q7_have_no_value() {
+        RunRecord record = TestRuns.run("run-s4", "way-a", "s4-rapid-changes", 1, 1, 1, List.of(
+                        commit(0, 0, V2, 90_000, 90_100)),
+                s4Overlapping(), samples(0, 250_000), 250_000);
+
+        RunMetrics metrics = s4.evaluate(record);
+
+        assertEquals(INVALID, metrics.verdict());
+        assertTrue(metrics.invalidReasons().contains("commit 2 of the scenario did not run"),
+                metrics.invalidReasons().toString());
+        assertNull(value(metrics, "Q1"));
+        assertNull(value(metrics, "Q7"));
+    }
+
+    @Test
+    void the_runs_csv_row_of_an_s4_run_has_one_cell_per_metric_column() {
+        RunRecord record = s4Run(s4Overlapping());
+        List<String> columns = Evaluator.columns(s4Scenario);
+
+        assertEquals(List.of("protocolVersion", "run_id", "approach", "block", "position", "attempt", "verdict",
+                "reasons", "flags", "Q1", "Q2", "Q3", "Q4_pods", "Q4_requests", "Q5", "Q6", "Q7"),
+                Evaluator.header(columns));
+        assertEquals(List.of("1", "run-s4", "way-a", "1", "1", "1", "VALID", "", "",
+                "7882", "12920", "3", "2", "333", "0", "0", "9980"),
+                Evaluator.row(record, s4.evaluate(record), columns));
+    }
+
     private static List<Observation> staggeredSwitch() {
         return load(0, 12_000, (pod, at) -> {
             double switchAt = pod.equals(A) ? 95_000 : pod.equals(B) ? 95_200 : 95_500;
@@ -1002,6 +1111,27 @@ class EvaluatorTest {
                         step(2, 60, Scenario.Action.DELETE_POD, 150_000, 150_300),
                         step(3, 120, Scenario.Action.INFRA_UP, 210_000, 212_000)),
                 observations, samples(0, 360_000), 360_000);
+    }
+
+    private static String s4OverlappingVersion(String pod, double at) {
+        if (pod.equals(A)) {
+            return at < 95_000 ? "v1" : at < 105_000 ? "v2" : "v3";
+        }
+        if (pod.equals(B)) {
+            return at < 98_000 ? "v1" : at < 108_000 ? "v2" : "v3";
+        }
+        return at < 106_000 ? "v1" : "v3";
+    }
+
+    private static List<Observation> s4Overlapping() {
+        return load(0, 12_500, EvaluatorTest::s4OverlappingVersion);
+    }
+
+    private static RunRecord s4Run(List<Observation> observations) {
+        return TestRuns.run("run-s4", "way-a", "s4-rapid-changes", 1, 1, 1, List.of(
+                        commit(0, 0, V2, 90_000, 90_100),
+                        commit(1, 10, new Payload("v3", "1000"), 100_000, 100_080)),
+                observations, samples(0, 250_000), 250_000);
     }
 
     private static Metric metric(RunMetrics metrics, String column) {

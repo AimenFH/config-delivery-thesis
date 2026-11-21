@@ -1241,6 +1241,68 @@ entries 08 and 10.
 
 ---
 
+## 2026-11-21: S4 commits two valid changes 10 seconds apart
+
+**Problem.** S1 changes the configuration once and waits. In operation changes
+also follow each other closely: a correction right after a change, or a
+generator that writes a new version every few minutes. Public incident reports
+show what can go wrong then. In the
+[Cloudflare outage of 18 November 2025](https://blog.cloudflare.com/18-november-2025-outage/)
+a file that was generated every five minutes was sometimes good and sometimes
+bad, and the network failed and recovered in turn. In the AWS DynamoDB outage
+of October 2025 two workers applied DNS plans of different age at the same
+time and the endpoint ended with an empty record. I know that one from the
+[InfoQ summary](https://www.infoq.com/news/2025/11/aws-dynamodb-outage-postmortem)
+and have not read the [AWS report](https://aws.amazon.com/message/101925)
+itself. No scenario so far shows whether an approach ends on the last version
+when a second change arrives while the first is still on its way, or which
+versions the replicas serve in between.
+
+**Rejected.** A gap shorter than the fastest delivery, so that the second
+commit lands inside the first delivery for every approach. Way C converged in
+a median of 1.6 s in the pilot runs and its commit alone took about 4 s, so no
+fixed gap does that. A gap per approach, which would let an approach shape its
+own test. Three or more commits, which make a run longer before one pair has
+been looked at. P1 and C1 of S1, which compare v1 with one new version and
+have no place for a third. A new protocol version: S4 adds a scenario file and
+changes no constant, step or metric of S1 to S3, and the plan names further
+scenario files on the same core as the way to cover more cases.
+
+**Chosen.** `scenarios/s4-rapid-changes.json`: commit v2 at 0 s, commit v3 at
+10 s, both with `timeoutMs` 1000, gate off, load for 150 s after the second
+commit, 10 valid runs. The gap is the same operator behaviour for every
+approach. Whether the second commit meets a delivery in progress is a property
+of the approach and is read from the data. 10 s lies inside Way A's rollout
+(median 28.2 s in the pilot runs) and inside Way B's 90 s `refreshDelay`. A
+scenario with more than one commit, no invalid version and no `infraDown`
+reports seven metrics over the time after the baseline:
+
+| Id | Metric | Definition | Unit |
+|---|---|---|---|
+| Q1, primary | Final convergence time | From `T0` of the last commit to the last answer that does not carry the last version. Censored with the flag `NOT_CONVERGED` if such an answer arrives in the last 10 s of the run | ms |
+| Q2, primary | Mixed-version time | Total time in which more than one version was served, computed as U3 | ms |
+| Q3 | Most versions at once | Highest number of versions served at the same time | count |
+| Q4 | Intermediate version exposure | Distinct pods that answered with v2, and the number of those answers | count |
+| Q5 | Pod regressions | C3 over the three versions | count |
+| Q6 | Failed-request ratio | A1 over the whole run after the baseline | ratio |
+| Q7 | Commit gap | `T0` of the last commit minus `T0` of the first | ms |
+
+Q7 is there because the steps run one after the other. A commit and trigger
+that take longer than 10 s push the second commit back, and Q7 shows by how
+much. The code is in `SuccessiveChanges`, and Q2 and Q3 share one sweep in
+`InfrastructureOutage`.
+
+**Cost.** One run takes about 6.8 minutes (250 s measured). Four approaches
+and 10 blocks need about 4.5 hours. For Way C the two changes most likely
+arrive one after the other, so S4 may say little about it that two S1 runs do
+not. Failed requests do not delay Q1 as they delay R1. They are counted in Q6
+only. One gap is measured, and another gap may give another order of the
+approaches. The metric ids grow from 27 to 34, and `NOT_CONVERGED` has a
+second meaning in S4. The scenario has unit tests and has not run on the
+cluster yet.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>

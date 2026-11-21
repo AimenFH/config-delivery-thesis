@@ -118,16 +118,18 @@ campaigns/s1-smoke.json          which scenario, how many valid runs, block seed
 | `maxBlocks` | Blocks at most. Not more than `maxBlocks` of the protocol (25) |
 | `seed` | Seed of the block order. The same seed gives the same order |
 
-The six campaign files:
+The eight campaign files:
 
 | File | Scenario | Valid runs | Blocks at most |
 |---|---|---|---|
 | `campaigns/s1-smoke.json` | S1 | 2 | 2 |
 | `campaigns/s2-smoke.json` | S2 | 1 | 1 |
 | `campaigns/s3-smoke.json` | S3 | 1 | 1 |
+| `campaigns/s4-smoke.json` | S4 | 1 | 1 |
 | `campaigns/s1.json` | S1 | 20 | 25 |
 | `campaigns/s2.json` | S2 | 10 | 25 |
 | `campaigns/s3.json` | S3 | 10 | 25 |
+| `campaigns/s4.json` | S4 | 10 | 25 |
 
 The files in `campaigns/legacy/` have the format of before 2026-11-15
 (`repetitions`, `ways`, `versionKey` and per-Way durations). The runner no longer
@@ -466,6 +468,7 @@ Then one column per metric column of the scenario:
 | S1 | `P1`, `P2`, `P3`, `C1`, `C1_max`, `C2`, `C3`, `A1`, `A2`, `A3`, `F1`, `F2_p50_B`, `F2_p95_B`, `F2_p99_B`, `F2_max_B`, `F2_p50_H`, `F2_p95_H`, `F2_p99_H`, `F2_max_H`, `F2_p99_ratio`, `F3`, `O1`, `O2`, `O3_cpu`, `O3_memory`, `O4`, `O5_extraComponents`, `O5_extraComponents_text`, `O5_operatorActions`, `O5_clusterWideRbac`, `O5_serviceCoupling`, `O5_requestedCpu`, `O5_requestedMemory` |
 | S2 | `E1`, `E2`, `E3_ratio`, `E3_outage`, `E4`, `R1` |
 | S3 | `U1`, `U2`, `U2_text`, `U3`, `U4`, `U5` |
+| S4 | `Q1`, `Q2`, `Q3`, `Q4_pods`, `Q4_requests`, `Q5`, `Q6`, `Q7` |
 
 A censored value is written with a leading `>`, for example `>149943.90895799999`.
 An empty cell means the metric could not be computed. `U2_text` is the version of
@@ -509,9 +512,9 @@ is not checked.
 
 | Flag | Set when |
 |---|---|
-| `NOT_CONVERGED` | P1 is reported and v1 is still served at the end of `H`, or v2 never appeared |
+| `NOT_CONVERGED` | P1 is reported and v1 is still served at the end of `H`, or v2 never appeared. In S4: Q1 is censored, a version other than the last is served in the last 10 s of the run |
 | `REGRESSION` | A pod answered an earlier version after a later one (C3 above 0) |
-| `FAILED_REQUESTS` | A request failed in `H` (S1) or anywhere after the baseline (S2, S3) |
+| `FAILED_REQUESTS` | A request failed in `H` (S1) or anywhere after the baseline (S2, S3, S4) |
 | `LOW_RESOLUTION` | A pod went unobserved for more than 1 000 ms after the baseline |
 | `NOT_RECOVERED` | R1 is censored (S2) |
 | `LOST_UPDATE` | U4 is censored (S3) |
@@ -637,8 +640,8 @@ flowchart LR
 | `WindowDetector` | First new and last old answer, the window and its upper bound, "still served" |
 | `CoverageCheck` | Longest unobserved gap per pod |
 | `Propagation`, `Consistency`, `Availability`, `Performance`, `Overhead`, `ResourceUsage` | The metrics of the five criteria |
-| `InvalidConfiguration`, `InfrastructureOutage` | The metrics of S2 and S3 |
-| `MetricId`, `Metric`, `RunMetrics` | The 27 metric ids, one value of a metric column, the result of one run |
+| `InvalidConfiguration`, `InfrastructureOutage`, `SuccessiveChanges` | The metrics of S2, S3 and S4 |
+| `MetricId`, `Metric`, `RunMetrics` | The 34 metric ids, one value of a metric column, the result of one run |
 | `Statistics`, `Summary`, `Csv` | Quartiles, bootstrap, Cliff's delta, `summary.csv`, CSV formatting |
 | `RunStore`, `ResultWriter` | Writes and reads the files of a run |
 | `LokiExport` | Turns a run into three streams of lines (`request`, `step`, `run`) and sends them to Loki in batches of 2 000 lines |
