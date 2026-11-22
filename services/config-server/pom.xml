@@ -7,19 +7,19 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.4</version>
+        <version>4.2.0</version>
         <relativePath/>
     </parent>
 
     <groupId>at.technikum.thesis</groupId>
     <artifactId>config-server</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0</version>
     <name>config-server</name>
     <description>Spring Cloud Config Server for Way C, with Spring Cloud Bus over RabbitMQ.</description>
 
     <properties>
         <java.version>21</java.version>
-        <spring-cloud.version>2023.0.3</spring-cloud.version>
+        <spring-cloud.version>2026.0.0</spring-cloud.version>
     </properties>
 
     <dependencies>

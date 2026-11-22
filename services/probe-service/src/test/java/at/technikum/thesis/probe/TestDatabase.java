@@ -1,6 +1,6 @@
 package at.technikum.thesis.probe;
 
-import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -10,7 +10,7 @@ import java.sql.SQLException;
 
 final class TestDatabase {
 
-    private static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:17.2");
+    private static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17.2");
 
     static {
         POSTGRES.start();
@@ -19,7 +19,7 @@ final class TestDatabase {
     private TestDatabase() {
     }
 
-    static PostgreSQLContainer<?> container() {
+    static PostgreSQLContainer container() {
         return POSTGRES;
     }
 

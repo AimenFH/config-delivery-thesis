@@ -24,7 +24,7 @@ class GateOnReadinessTest {
     private static void assertProbeAnswers(RunningProbe probe, String version) {
         RunningProbe.Answer answer = probe.get("/probe");
         assertEquals(200, answer.status());
-        assertEquals(version, answer.json().get("configVersion").asText());
+        assertEquals(version, answer.json().get("configVersion").asString());
         assertEquals(5, answer.json().size());
     }
 
@@ -33,10 +33,10 @@ class GateOnReadinessTest {
         assertLivenessUpWithoutGate(probe);
         RunningProbe.Answer configHealth = probe.get("/config-health");
         assertEquals(200, configHealth.status());
-        assertEquals("VALID", configHealth.json().get("status").asText());
-        assertEquals(version, configHealth.json().get("configVersion").asText());
+        assertEquals("VALID", configHealth.json().get("status").asString());
+        assertEquals(version, configHealth.json().get("configVersion").asString());
         assertEquals("UP", probe.get("/actuator/health").json()
-                .get("components").get("configGate").get("status").asText());
+                .get("components").get("configGate").get("status").asString());
         assertProbeAnswers(probe, version);
     }
 
@@ -45,13 +45,13 @@ class GateOnReadinessTest {
         assertLivenessUpWithoutGate(probe);
         RunningProbe.Answer configHealth = probe.get("/config-health");
         assertEquals(503, configHealth.status());
-        assertEquals("INVALID", configHealth.json().get("status").asText());
+        assertEquals("INVALID", configHealth.json().get("status").asString());
         assertEquals(1, configHealth.json().get("violations").size());
-        assertEquals(violation, configHealth.json().get("violations").get(0).asText());
+        assertEquals(violation, configHealth.json().get("violations").get(0).asString());
         var gate = probe.get("/actuator/health").json().get("components").get("configGate");
-        assertEquals("DOWN", gate.get("status").asText());
+        assertEquals("DOWN", gate.get("status").asString());
         assertEquals(1, gate.get("details").get("violations").size());
-        assertEquals(violation, gate.get("details").get("violations").get(0).asText());
+        assertEquals(violation, gate.get("details").get("violations").get(0).asString());
         assertProbeAnswers(probe, version);
     }
 

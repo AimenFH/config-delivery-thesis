@@ -23,8 +23,8 @@ class GateOffReadinessTest {
     private static void assertValidEndpoints(RunningProbe probe) {
         RunningProbe.Answer configHealth = probe.get("/config-health");
         assertEquals(200, configHealth.status());
-        assertEquals("VALID", configHealth.json().get("status").asText());
-        assertEquals("v0", configHealth.json().get("configVersion").asText());
+        assertEquals("VALID", configHealth.json().get("status").asString());
+        assertEquals("v0", configHealth.json().get("configVersion").asString());
         assertEquals(2, configHealth.json().size());
         assertProbeAnswers(probe);
     }
@@ -32,10 +32,10 @@ class GateOffReadinessTest {
     private static void assertInvalidEndpoints(RunningProbe probe) {
         RunningProbe.Answer configHealth = probe.get("/config-health");
         assertEquals(503, configHealth.status());
-        assertEquals("INVALID", configHealth.json().get("status").asText());
+        assertEquals("INVALID", configHealth.json().get("status").asString());
         assertEquals(1, configHealth.json().get("violations").size());
         assertEquals("demo.timeoutMs='abc' is not an integer",
-                configHealth.json().get("violations").get(0).asText());
+                configHealth.json().get("violations").get(0).asString());
         assertEquals(2, configHealth.json().size());
         assertProbeAnswers(probe);
     }
@@ -43,8 +43,8 @@ class GateOffReadinessTest {
     private static void assertProbeAnswers(RunningProbe probe) {
         RunningProbe.Answer answer = probe.get("/probe");
         assertEquals(200, answer.status());
-        assertEquals("v0", answer.json().get("configVersion").asText());
-        assertEquals("UNSET", answer.json().get("value").asText());
+        assertEquals("v0", answer.json().get("configVersion").asString());
+        assertEquals("UNSET", answer.json().get("value").asString());
         assertEquals(5, answer.json().size());
     }
 

@@ -24,7 +24,7 @@ class ProbeStoresRequestTest {
     @Test
     void the_stored_pod_is_the_pod_of_the_answer() throws SQLException {
         try (RunningProbe probe = RunningProbe.start("demo.configVersion=v72")) {
-            String pod = probe.get("/probe").json().get("pod").asText();
+            String pod = probe.get("/probe").json().get("pod").asString();
 
             try (Connection connection = TestDatabase.connect();
                  Statement statement = connection.createStatement();
@@ -61,7 +61,7 @@ class ProbeStoresRequestTest {
             long elapsedMillis = (System.nanoTime() - before) / 1_000_000;
 
             assertEquals(503, blocked.status());
-            assertEquals("database", blocked.json().get("error").asText());
+            assertEquals("database", blocked.json().get("error").asString());
             assertTrue(elapsedMillis >= 200 && elapsedMillis < 1500, "elapsed " + elapsedMillis + " ms");
 
             blocker.rollback();

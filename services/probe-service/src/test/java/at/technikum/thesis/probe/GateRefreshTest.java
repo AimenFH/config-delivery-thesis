@@ -23,7 +23,7 @@ class GateRefreshTest {
         assertEquals(configHealth, probe.get("/config-health").status());
         RunningProbe.Answer answer = probe.get("/probe");
         assertEquals(200, answer.status());
-        assertEquals(version, answer.json().get("configVersion").asText());
+        assertEquals(version, answer.json().get("configVersion").asString());
     }
 
     @Test
