@@ -1,4 +1,4 @@
-image: probe-service:0.2.0
+image: probe-service:0.3.0
 replicas: 3
 
 config:

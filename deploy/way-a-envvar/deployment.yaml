@@ -28,7 +28,7 @@ spec:
             matchLabels: { app: probe-service }
       containers:
         - name: probe
-          image: probe-service:0.2.0
+          image: probe-service:0.3.0
           imagePullPolicy: IfNotPresent
           ports: [{containerPort: 8080}]
           env:
@@ -38,6 +38,12 @@ spec:
               valueFrom: {configMapKeyRef: {name: demo-config, key: configVersion}}
             - name: DEMO_TIMEOUTMS
               valueFrom: {configMapKeyRef: {name: demo-config, key: timeoutMs}}
+            - name: DB_URL
+              value: jdbc:postgresql://postgres.data.svc:5432/probe
+            - name: DB_USER
+              valueFrom: {secretKeyRef: {name: probe-db, key: username}}
+            - name: DB_PASSWORD
+              valueFrom: {secretKeyRef: {name: probe-db, key: password}}
           readinessProbe:
             httpGet: {path: /actuator/health/readiness, port: 8080}
             periodSeconds: 2
