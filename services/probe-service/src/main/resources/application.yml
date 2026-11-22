@@ -11,6 +11,12 @@ spring:
     port: 5672
     username: ${RABBITMQ_USER:thesis}
     password: ${RABBITMQ_PASSWORD:thesis}
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://postgres.data.svc:5432/probe}
+    username: ${DB_USER:thesis}
+    password: ${DB_PASSWORD:thesis}
+    hikari:
+      connection-timeout: 1000
 
 demo:
   value: "UNSET"

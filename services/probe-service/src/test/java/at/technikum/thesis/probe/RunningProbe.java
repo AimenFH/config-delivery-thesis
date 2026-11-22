@@ -38,6 +38,9 @@ final class RunningProbe implements AutoCloseable {
         args.add("--server.port=0");
         args.add("--management.endpoint.health.probes.enabled=true");
         args.add("--spring.jmx.enabled=false");
+        args.add("--spring.datasource.url=" + TestDatabase.container().getJdbcUrl());
+        args.add("--spring.datasource.username=" + TestDatabase.container().getUsername());
+        args.add("--spring.datasource.password=" + TestDatabase.container().getPassword());
         for (String property : properties) {
             args.add("--" + property);
         }
