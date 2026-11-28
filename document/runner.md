@@ -172,13 +172,26 @@ and no campaign can override it.
 | `bootstrapResamples`, `bootstrapSeed` | 10000, 20261115 | Bootstrap interval of the median in `summary.csv` |
 | `approaches` | four paths | The approach descriptors, in the order used for the block draw |
 | `workload` | object | Fixed fields that `InvariantCheck` compares with the live objects |
+| `database` | object | Where the runner empties the request table before every run |
 
-The `workload` block: image `probe-service:0.2.0`, container `probe`, requests
+The `workload` block: image `probe-service:0.3.0`, container `probe`, requests
 250m and 384Mi, limits 500m and 512Mi, readiness probe on
 `/actuator/health/readiness` port 8080 every 2 s, one topology spread constraint
 on `kubernetes.io/hostname` with max skew 1 and `DoNotSchedule`, and a `NodePort`
 Service with port 80, target port 8080, node port 30080 and the selector
 `app: probe-service`.
+
+The `database` block: namespace `data`, pod `postgres-0`, container `postgres`,
+user `thesis`, database `probe`, table `probe_request`. The runner uses it for one
+`kubectl exec` per run:
+
+```bash
+kubectl -n data exec postgres-0 -c postgres -- psql -U thesis -d probe -v ON_ERROR_STOP=1 -c "do $$ begin if to_regclass('probe_request') is not null then truncate table probe_request; end if; end $$"
+```
+
+On a new cluster Flyway has not created the table yet, and the command succeeds
+without doing anything. The reason for the step is in the
+[decision entry](../docs/DECISIONS.md#2026-11-28-the-runner-empties-the-probe_request-table-before-every-run).
 
 ### Scenario file
 
@@ -304,7 +317,7 @@ One run, with the step numbers of the plan:
 
 | # | Step | On failure |
 |---|---|---|
-| 1 | Delete the Deployment, wait until its pods are gone | Campaign stops |
+| 1 | Delete the Deployment, wait until its pods are gone, empty the table `probe_request` (see the [`database` block](#protocol-file)) | Campaign stops |
 | 2 | `reset` of the approach, then `sourceCheck` if it has one | Campaign stops on a failed `reset` |
 | 3 | `kubectl apply -f` of every manifest, wait for the rollout, set `CONFIG_GATE_ENABLED`, wait for the rollout again | Campaign stops |
 | 4 | Settle: wait 100 s | |
@@ -624,7 +637,7 @@ flowchart LR
 | `ChangeTrigger` | Starts a child process and records start, end, exit code and output |
 | `Campaign` | Blocks, retries, the procedure of one run, the campaign exit code |
 | `BlockPlan` | Draws the order of all blocks from the seed |
-| `ClusterControl` | Every `kubectl` call of the core, and the steady check |
+| `ClusterControl` | Every `kubectl` call of the core, emptying the request table, and the steady check |
 | `InvariantCheck` | Compares Deployment, Service and pods with the `workload` block of the protocol |
 | `Fingerprint` | Collects and writes `fingerprint.json` |
 | `StepExecutor` | Executes the steps of a scenario on time and restores the infrastructure |

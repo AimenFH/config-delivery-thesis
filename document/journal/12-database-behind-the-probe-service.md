@@ -92,8 +92,9 @@ is not recorded.
 
 ## What was not checked
 
-- The unit tests of probe-service. I have no record of a Maven run after the
-  Spring Boot 4 commit.
+- The unit tests of probe-service, until 28 November. Then `mvn -o test` ran
+  29 tests with no failure, including the four against a PostgreSQL 17.2
+  container. config-server has no tests and only compiles.
 - What a pod does when the database is not there at start. Flyway runs at
   start, so I expect the pod not to start; not tried.
 - Whether the extra insert changes the window or the failed-request numbers.
@@ -121,7 +122,12 @@ options are in
 
 The step runs while no probe-service pod exists, so nothing writes to the table
 at that moment. It skips a table that is not there yet: on a new cluster Flyway
-creates it only at the first start of probe-service, which comes after the step. A failure stops the campaign like every other core step. The
+creates it only at the first start of probe-service, which comes after the step.
+
+I checked it in a real campaign the same afternoon: one run per Way with S1
+(`20261128-160724_verify-table-reset`, 4 of 4 valid). A loop counted the rows
+every 20 seconds. The count rose to about 11,500 to 12,200 in each run and fell
+to 0 at the start of the next one; it never added up across runs. A failure stops the campaign like every other core step. The
 same day the [experiment runbook](../runbook-experiment-1.md) got a check that
 applies `deploy/data/` and `deploy/probe-db-secret.yaml`, and its image tag is
 now 0.3.0.

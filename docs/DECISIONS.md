@@ -1577,6 +1577,37 @@ lost when the next run starts; nothing in the evaluation reads them.
 
 ---
 
+## 2026-11-28: probe-service tests load Mockito as a Java agent at JVM start
+
+**Problem.** Every `mvn test` of probe-service printed three warnings: Mockito was
+"self-attaching to enable the inline-mock-maker", the JDK said that dynamically
+loaded agents will be disallowed in a future release, and the JVM said that class
+data sharing works only for boot loader classes. No test uses Mockito directly;
+Spring Boot's test support starts it. On a later JDK the self-attach would stop
+working and the tests would fail.
+
+**Rejected.** Leaving it: the warning is a dated failure. Switching Mockito to the
+subclass mock maker: it cannot mock final classes, and it changes Mockito's
+behaviour for a problem that is only about how it is loaded. Turning the JDK
+warning off with `-XX:+EnableDynamicAgentLoading`: it hides the message and keeps
+the mechanism the JDK is removing.
+
+**Chosen.** The way Mockito's documentation describes: in
+`services/probe-service/pom.xml` the `maven-dependency-plugin` goal `properties`
+gives the path of the `mockito-core` jar as `${org.mockito:mockito-core:jar}`,
+and `maven-surefire-plugin` starts the test JVM with
+`-Xshare:off -javaagent:${org.mockito:mockito-core:jar}`. `-Xshare:off` turns off
+class data sharing in the test JVM only, which removes the third warning. The
+`@{argLine}` prefix that some guides show is left out, because no other plugin
+here sets `argLine`, and with nothing to fill it the test JVM does not start.
+
+**Cost.** Two plugin blocks in the pom. Without class data sharing the test JVM
+might start a little slower; the whole build took 12.1 s against 12.4 s before.
+If a coverage plugin such as JaCoCo is added later, its `argLine` has to be joined
+with this one by hand. 29 tests, 0 failures, no warnings.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>

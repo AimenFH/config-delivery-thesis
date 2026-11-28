@@ -75,7 +75,9 @@ really started, for example 90 003.9 ms, and not the planned 90 000 ms.
 #### `Protocol`
 
 - Does: holds every constant of the protocol file, including the nested
-  `Workload` record with the fixed fields of the Deployment and Service.
+  `Workload` record with the fixed fields of the Deployment and Service, and the
+  nested `Database` record with namespace, pod, container, user, database and
+  table of PostgreSQL.
 - In and out: `read(file)` gives a `Protocol` or throws with the list of problems.
 - Plan: "Test protocol", "Constants", "What an approach may vary".
 - Easy to get wrong: `targetVersion` is checked (it must differ from
@@ -185,7 +187,7 @@ really started, for example 90 003.9 ms, and not the planned 90 000 ms.
   out.
 - Plan: "Procedure for one run", "Campaign design", "Failure handling".
 - Easy to get wrong: a run has two clocks. `preparation` times the steps before
-  the load (delete, reset, deploy, settle, checks). A new `RunnerClock` starts
+  the load (delete, empty the table, reset, deploy, settle, checks). A new `RunnerClock` starts
   just before the load, and all measured times are on it. That is why the
   `sourceCheck` in a meta file has negative times.
 
@@ -202,8 +204,8 @@ really started, for example 90 003.9 ms, and not the planned 90 000 ms.
 
 #### `ClusterControl`
 
-- Does: every `kubectl` call of the core (delete, wait, rollout status, set env,
-  scale, delete pod, get as JSON) and the steady check.
+- Does: every `kubectl` call of the core (delete, wait, empty the table, rollout
+  status, set env, scale, delete pod, get as JSON) and the steady check.
 - In and out: protocol, `CommandRunner`, `ServiceProbe` and `Pacer` go in.
   Results, JSON trees and `Snapshot` records come out.
 - Plan: "Procedure for one run" steps 1, 3 and 5, "Scenarios" (the core actions),
@@ -211,7 +213,11 @@ really started, for example 90 003.9 ms, and not the planned 90 000 ms.
 - Easy to get wrong: `awaitSteady` compares each snapshot with the one before it,
   10 s apart. Both must be steady and have the same pod names. A snapshot is 60
   requests sent one after the other, not at 50 per second. "Under 200 ms" is
-  strict: an answer of exactly 200 ms is not steady.
+  strict: an answer of exactly 200 ms is not steady. `emptyTable` runs `psql` in
+  `postgres-0` with the names of the `database` block. The `truncate` sits in a
+  `do` block that first asks `to_regclass`, so it also succeeds before Flyway has
+  created the table. It runs after the old pods are gone, so no pod writes while
+  the table is emptied.
 
 #### `InvariantCheck`
 

@@ -194,25 +194,26 @@ that is not on disk.
 ## Timeline of one run
 
 ```
-        not measured                 measured on the runner clock
- ___________________________   _____________________________________________________
-|        |         |        | |          |            |                             |
-| reset  | deploy  | settle | | warm-up  | baseline B | observation H               |
-|        |         | 100 s  | | 30 s     | 60 s       | 150 s                       |
-|________|_________|________| |__________|____________|_____________________________|
-                              0          30 s         t_cs  T0                      t_cs + 150 s
-                                                      |     |
-                                              commit starts  commit acknowledged, trigger fires
+                       not measured                        measured on the runner clock
+ _______________________________________________________   _____________________________________________________
+|           |       |       |        |        |         | |          |            |                             |
+| delete    | empty | reset | deploy | settle | checks, | | warm-up  | baseline B | observation H               |
+| pods gone | table |       |        | 100 s  | steady  | | 30 s     | 60 s       | 150 s                       |
+|___________|_______|_______|________|________|_________| |__________|____________|_____________________________|
+                                                          0          30 s         t_cs  T0                      t_cs + 150 s
+                                                                                  |     |
+                                                                    commit starts  commit acknowledged, trigger fires
 
- load at 50 req/s:            |======================================================|
- resource samples every 5 s:  |======================================================|
+ load at 50 req/s:                                        |======================================================|
+ resource samples every 5 s:                              |======================================================|
 ```
 
 This is S1. Every run starts from a deleted Deployment and a source reset to v1,
 so no approach carries state from the run before. The source is reset before the
 workload is deployed, so no trigger fires on a fresh Deployment. Between the
 deletion and the reset the runner empties the table `probe_request`, so every
-run starts with the same table size.
+run starts with the same table size. The checks before the load are the
+`InvariantCheck` and the steady check, two snapshots of 60 probes each.
 
 | Symbol | Definition |
 |---|---|
@@ -458,7 +459,7 @@ connection for each request.
 | Argo CD runs with self-heal off | The correction of drift, a main reason for GitOps, is not part of the experiment | Stated |
 | Argo CD runs in the background of every run since 2026-11-21 | Numbers from earlier campaigns were measured without it | A smoke campaign before the full campaigns, see [journal entry 10](journal/10-way-d-argo-cd-and-helm.md#open-points) |
 | Each approach is measured in one configuration | Way B's 90 s is its `refreshDelay`, Way A's window depends on readiness time and surge settings | Results describe configurations, settings documented |
-| All replicas share one PostgreSQL, and it is not in the readiness group | A pod without its database stays ready and answers 503; the runner does not check the database before a run | Stated, see [journal entry 12](journal/12-database-behind-the-probe-service.md#open-points) |
+| All replicas share one PostgreSQL, and it is not in the readiness group | A pod without its database stays ready and answers 503. The runner reaches the database only when it empties the table before a run, so a database that is down then stops the campaign, and one that fails during a run shows only as 503 answers | Stated, see [journal entry 12](journal/12-database-behind-the-probe-service.md#open-points) |
 | Smoke campaigns before 2026-11-28 ran image 0.2.0 on Spring Boot 3.3.4 without a database | Their numbers are not comparable with later ones | The image is in `fingerprint.json` of every campaign |
 | S3 takes all delivery components of an approach down at once | For Way C the effects of Config Server and RabbitMQ are not separated, for Way D those of the three Argo CD components | Stated |
 
