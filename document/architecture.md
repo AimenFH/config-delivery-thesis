@@ -66,6 +66,7 @@ flowchart LR
 | Way C manifests | `deploy/way-c-configserver/` | Same service, configuration fetched from the Config Server, Bus enabled. |
 | Way D manifests | `deploy/way-d-gitops/` | The Argo CD Application and its project. The folder `chart/` is a copy of the Helm chart of the same service. Argo CD reads the chart from the branch `way-d` of the configuration repository. |
 | Platform | `deploy/platform/`, `deploy/reloader/` | Namespace `platform` with the delivery components of all approaches: Reloader (Way A), the Configuration Watcher (Way B), Config Server and RabbitMQ (Way C), Argo CD (Way D, `deploy/platform/argocd/`). Installed once. All of them run during every run. |
+| Database | `deploy/data/`, `deploy/probe-db-secret.yaml` | Namespace `data` with one PostgreSQL 17.2 on the control-plane node. probe-service writes one row per `GET /probe` into `probe_request`. It is not a configuration source, and every Way reaches it in the same way through the Secret `probe-db`. See [journal entry 12](journal/12-database-behind-the-probe-service.md). |
 | Config Server | `services/config-server/` | Spring Cloud Config Server that reads a Git repository on GitHub. |
 | Monitoring | `deploy/monitoring/` | Namespace `monitoring` with Loki, Alloy and Grafana on the control-plane node. Keeps the pod logs and shows loaded results. It is not part of what is measured. See the [monitoring runbook](runbook-monitoring.md). |
 | Experiment runner | `tools/experiment-runner/` | Measurement instrument and fixed core: campaigns, load, resource sampling, evaluation. See [Experiment runner](runner.md). |
@@ -101,7 +102,7 @@ flowchart TB
     end
 
     subgraph cluster["kind cluster"]
-        svc["Service and 3 probe-service replicas<br/>image 0.2.0, readiness gate switch"]
+        svc["Service and 3 probe-service replicas<br/>image 0.3.0, readiness gate switch"]
         infra["platform namespace<br/>Reloader, Watcher, Config Server, RabbitMQ, Argo CD"]
     end
 
@@ -171,7 +172,7 @@ campaign if a fixed field differs from the protocol file.
 | Fixed for all, checked | Free per approach |
 |---|---|
 | 3 replicas, 3 running pods, one per node | Environment variables other than `CONFIG_GATE_ENABLED`, volumes and mounts |
-| Image `probe-service:0.2.0`, and the same image id in every run of a campaign | Labels and annotations |
+| Image `probe-service:0.3.0`, and the same image id in every run of a campaign | Labels and annotations |
 | CPU and memory requests and limits | `preStop` and rollout strategy |
 | Readiness probe path, port and period | Configuration source objects (ConfigMap, Git repository) |
 | One topology spread constraint with the key, skew and policy of the protocol | Delivery components in `platform` |
@@ -209,7 +210,9 @@ that is not on disk.
 
 This is S1. Every run starts from a deleted Deployment and a source reset to v1,
 so no approach carries state from the run before. The source is reset before the
-workload is deployed, so no trigger fires on a fresh Deployment.
+workload is deployed, so no trigger fires on a fresh Deployment. Between the
+deletion and the reset the runner empties the table `probe_request`, so every
+run starts with the same table size.
 
 | Symbol | Definition |
 |---|---|
@@ -426,14 +429,18 @@ Each decision is recorded in full, with rejected alternatives, in
 | Way D with Argo CD and a Helm chart | The fourth approach is built the way a team with GitOps would build it |
 | Argo CD without self-heal, on its own branch | It must not undo the gate setting of the runner or the Deployment of another approach |
 | Way D's trigger is a refresh request | It stands for the webhook that GitHub cannot send to a local cluster |
+| probe-service writes one row to PostgreSQL per request | The service under test uses a database while it answers, as the professor asked, and `timeoutMs` gets a real effect |
+| Database settings through one Secret, outside the four delivery paths | The database is not the configuration under test, so it must not differ between the Ways |
 
 ## Data flow of one observation
 
 1. A client sends `GET /probe` to `localhost:30080`.
 2. kind forwards the port into the control-plane node.
 3. kube-proxy chooses one ready pod for the connection.
-4. The pod answers with its current `configVersion`, `pod`, `startedAt`, `servedAt`.
-5. The client records its own receive time. Comparing versions across responses
+4. The pod inserts one row with its pod name and `configVersion` into PostgreSQL,
+   with `timeoutMs` as the statement timeout. If that fails it answers 503.
+5. The pod answers with its current `configVersion`, `pod`, `startedAt`, `servedAt`.
+6. The client records its own receive time. Comparing versions across responses
    over time gives the inconsistency window.
 
 kube-proxy balances connections rather than individual requests. A client that keeps one
@@ -451,6 +458,8 @@ connection for each request.
 | Argo CD runs with self-heal off | The correction of drift, a main reason for GitOps, is not part of the experiment | Stated |
 | Argo CD runs in the background of every run since 2026-11-21 | Numbers from earlier campaigns were measured without it | A smoke campaign before the full campaigns, see [journal entry 10](journal/10-way-d-argo-cd-and-helm.md#open-points) |
 | Each approach is measured in one configuration | Way B's 90 s is its `refreshDelay`, Way A's window depends on readiness time and surge settings | Results describe configurations, settings documented |
+| All replicas share one PostgreSQL, and it is not in the readiness group | A pod without its database stays ready and answers 503; the runner does not check the database before a run | Stated, see [journal entry 12](journal/12-database-behind-the-probe-service.md#open-points) |
+| Smoke campaigns before 2026-11-28 ran image 0.2.0 on Spring Boot 3.3.4 without a database | Their numbers are not comparable with later ones | The image is in `fingerprint.json` of every campaign |
 | S3 takes all delivery components of an approach down at once | For Way C the effects of Config Server and RabbitMQ are not separated, for Way D those of the three Argo CD components | Stated |
 
 The full list is in the [plan](../docs/experiment-plan.md#scientific-limitations).

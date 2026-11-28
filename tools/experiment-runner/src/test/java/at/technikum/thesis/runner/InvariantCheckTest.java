@@ -44,7 +44,7 @@ class InvariantCheckTest {
     void another_image_is_a_difference() {
         container().put("image", "probe-service:0.1.0");
 
-        assertEquals(List.of("image is probe-service:0.1.0, the protocol says probe-service:0.2.0"),
+        assertEquals(List.of("image is probe-service:0.1.0, the protocol says probe-service:0.3.0"),
                 differences(false));
     }
 

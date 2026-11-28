@@ -21,7 +21,8 @@ the reasons are the three entries of 2026-11-21 in
 | Requirement | Check |
 |---|---|
 | The cluster and the namespaces `thesis` and `platform` exist | `kubectl get nodes` shows four nodes, `kubectl get namespace thesis platform` shows two |
-| The image `probe-service:0.2.0` is loaded | See the [runbook of experiment 1](runbook-experiment-1.md#2-the-image-probe-service020-is-loaded) |
+| The image `probe-service:0.3.0` is loaded | See the [runbook of experiment 1](runbook-experiment-1.md#2-the-image-probe-service030-is-loaded) |
+| PostgreSQL and the Secret `probe-db` exist | See the [runbook of experiment 1](runbook-experiment-1.md#3-the-database-is-up). The chart does not contain the Secret, and the AppProject would not let Argo CD create one |
 | A clone of the configuration repository in `~/config-repo` with push access | `git -C ~/config-repo ls-remote -q origin HEAD` prints a commit hash without asking for a password |
 | The cluster reaches GitHub | Argo CD fetches `https://github.com/AimenFH/config-delivery-config.git` |
 

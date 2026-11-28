@@ -72,11 +72,11 @@ class FingerprintTest {
         assertEquals(4, fingerprint.nodeCount());
         assertEquals(List.of(
                 new Fingerprint.Image("thesis", "probe-service-f664c8f55-7hfd6", "probe",
-                        "docker.io/library/probe-service:0.2.0", IMAGE_ID),
+                        "docker.io/library/probe-service:0.3.0", IMAGE_ID),
                 new Fingerprint.Image("thesis", "probe-service-f664c8f55-jfsxk", "probe",
-                        "docker.io/library/probe-service:0.2.0", IMAGE_ID),
+                        "docker.io/library/probe-service:0.3.0", IMAGE_ID),
                 new Fingerprint.Image("thesis", "probe-service-f664c8f55-ldcdv", "probe",
-                        "docker.io/library/probe-service:0.2.0", IMAGE_ID)), fingerprint.workloadImages());
+                        "docker.io/library/probe-service:0.3.0", IMAGE_ID)), fingerprint.workloadImages());
         assertEquals(List.of(new Fingerprint.Image("platform", "rabbitmq-1", "rabbitmq", "rabbitmq:1",
                 "sha256:rabbit")), fingerprint.infrastructureImages());
         assertEquals("openjdk version \"21.0.4\" 2024-07-16", fingerprint.javaVersion());

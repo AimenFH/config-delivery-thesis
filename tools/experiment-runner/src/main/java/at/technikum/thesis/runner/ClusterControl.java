@@ -55,6 +55,19 @@ public final class ClusterControl {
         return kubectl(clock, protocol.namespace(), "wait", "--for=delete", "pod", "-l", selector(), timeout());
     }
 
+    public ChangeTrigger.Result emptyTable(RunnerClock clock) {
+        Protocol.Database database = protocol.database();
+        List<String> argv = List.of("kubectl", "-n", database.namespace(), "exec", database.pod(),
+                "-c", database.container(), "--", "psql", "-U", database.user(), "-d", database.name(),
+                "-v", "ON_ERROR_STOP=1", "-c", emptyTableSql(database.table()));
+        return commands.run(argv, clock, protocol.steadyTimeoutSeconds() * 1000L);
+    }
+
+    static String emptyTableSql(String table) {
+        return "do $$ begin if to_regclass('" + table + "') is not null then truncate table " + table
+                + "; end if; end $$";
+    }
+
     public ChangeTrigger.Result rolloutStatus(RunnerClock clock) {
         return rolloutStatus(protocol.namespace(), protocol.deployment(), clock);
     }

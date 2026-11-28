@@ -38,15 +38,26 @@ Expected result: four nodes, all `Ready`: `thesis-control-plane`, `thesis-worker
 Repeat the build steps after every code change.
 
 ```bash
-(cd services/probe-service && mvn -q -DskipTests package && docker build -t probe-service:0.1.0 .)
+(cd services/probe-service && mvn -q -DskipTests package && docker build -t probe-service:0.3.0 .)
 ```
 
 ```bash
-kind load docker-image probe-service:0.1.0 --name thesis
+kind load docker-image probe-service:0.3.0 --name thesis
 ```
 
+Since 0.3.0 probe-service writes one row to PostgreSQL per request and runs
+Flyway when it starts, so the database has to be up before the Deployment. This
+step does nothing on a cluster that has it already:
+
 ```bash
-kubectl apply -f deploy/namespace.yaml && kubectl apply -f deploy/way-a-envvar/
+kubectl apply -f deploy/data/ && kubectl -n data rollout status statefulset/postgres --timeout=120s
+```
+
+Expected result: `partitioned roll out complete`. The checks for the database are
+in the [runbook of experiment 1](runbook-experiment-1.md#3-the-database-is-up).
+
+```bash
+kubectl apply -f deploy/namespace.yaml && kubectl apply -f deploy/probe-db-secret.yaml && kubectl apply -f deploy/way-a-envvar/
 ```
 
 ```bash
@@ -151,13 +162,16 @@ Way A prints `DEMO_VALUE DEMO_CONFIGVERSION DEMO_TIMEOUTMS`, Way B prints
 | Symptom | Cause | Fix |
 |---|---|---|
 | `pull access denied for probe-service` on `docker run` | The image was never built, so Docker looked on Docker Hub | Run the build step in section 2 |
-| Pods in `ErrImagePull` or `ImagePullBackOff` | The image is not inside the kind nodes, or the name/tag differs from the manifest | `kind load docker-image probe-service:0.1.0 --name thesis`; check `image:` in the Deployment |
+| Pods in `ErrImagePull` or `ImagePullBackOff` | The image is not inside the kind nodes, or the name/tag differs from the manifest | `kind load docker-image probe-service:0.3.0 --name thesis`; check `image:` in the Deployment |
+| Pods in `CreateContainerConfigError`, Events say *secret "probe-db" not found* | The Secret with the database user was not applied | `kubectl apply -f deploy/probe-db-secret.yaml` |
+| Pods restart again and again, the log shows a Flyway or connection error | PostgreSQL is not up, and probe-service cannot start without it | Apply `deploy/data/` and wait for `postgres-0`, see section 2 |
+| `/probe` answers `503` with `{"error":"database"}` | The pod is up but the insert failed or took longer than `timeoutMs` | `kubectl -n data get pods`; see the [probe API page](probe-api.md#get-probe) |
 | A pod stays `Pending` with *"didn't match pod topology spread constraints"* | The spread rule counts the tainted control-plane node | The Deployment needs `nodeTaintsPolicy: Honor` (see [DECISIONS](../docs/DECISIONS.md)) |
 | Two new pods on the same node after a rollout | The spread rule counts old pods too | The Deployment needs `matchLabelKeys: [pod-template-hash]` |
 | Rollout waits forever, old pods still serve `v1` | A new pod cannot start or become ready | `kubectl -n thesis describe pod <pending-pod>` and read the Events section |
 | `curl localhost:30080` connection refused | Cluster created without the port mapping, or Service is not NodePort | Recreate the cluster with `deploy/kind/kind-cluster.yaml`; check `kubectl -n thesis get svc` shows `80:30080/TCP` |
 | Every answer comes from the same pod | The client reuses one connection | Use a new connection per request (`curl` does this by default) |
-| Code change not visible in the cluster | Same tag `0.1.0` reused, pods still run the old image | Rebuild, `kind load`, then `kubectl -n thesis rollout restart deployment/probe-service` |
+| Code change not visible in the cluster | Same tag `0.3.0` reused, pods still run the old image | Rebuild, `kind load`, then `kubectl -n thesis rollout restart deployment/probe-service` |
 | `Whitelabel Error Page` with 404 | You opened `/`, which has no mapping | Use `/probe` or `/config-health` |
 
 ## Useful commands

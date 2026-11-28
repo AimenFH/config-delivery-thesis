@@ -20,6 +20,9 @@ class RunProcedureTest {
 
     private static final String DELETE = "$ kubectl -n thesis delete deployment probe-service --ignore-not-found --wait=true";
     private static final String PODS_GONE = "$ kubectl -n thesis wait --for=delete pod -l app=probe-service --timeout=120s";
+    private static final String EMPTY_TABLE = "$ kubectl -n data exec postgres-0 -c postgres -- psql -U thesis"
+            + " -d probe -v ON_ERROR_STOP=1 -c do $$ begin if to_regclass('probe_request') is not null"
+            + " then truncate table probe_request; end if; end $$";
     private static final String ROLLOUT = "$ kubectl -n thesis rollout status deployment/probe-service --timeout=120s";
     private static final String GATE_OFF = "$ kubectl -n thesis set env deployment/probe-service CONFIG_GATE_ENABLED=false";
     private static final String GATE_ON = "$ kubectl -n thesis set env deployment/probe-service CONFIG_GATE_ENABLED=true";
@@ -47,6 +50,7 @@ class RunProcedureTest {
         assertEquals(List.of(
                 DELETE,
                 PODS_GONE,
+                EMPTY_TABLE,
                 "way-c reset",
                 "way-c sourceCheck",
                 "way-c deploy",
@@ -89,8 +93,8 @@ class RunProcedureTest {
         assertEquals(0, world.campaign().run());
 
         List<String> log = world.logFrom(DELETE);
-        assertEquals(List.of(DELETE, PODS_GONE, "way-a reset", "way-a deploy", ROLLOUT, GATE_OFF, ROLLOUT,
-                "wait 100000 until 100000"), log.subList(0, 8));
+        assertEquals(List.of(DELETE, PODS_GONE, EMPTY_TABLE, "way-a reset", "way-a deploy", ROLLOUT, GATE_OFF,
+                ROLLOUT, "wait 100000 until 100000"), log.subList(0, 9));
         assertEquals(List.of("wait 90000 until 90000", "way-a commit v2 1000", "wait 149880 until 240000",
                 "load stop"), log.subList(log.indexOf("wait 90000 until 90000"), log.indexOf("load stop") + 1));
         assertNull(world.store.records.get(0).sourceCheck());
@@ -104,8 +108,8 @@ class RunProcedureTest {
         assertEquals(0, world.campaign().run());
 
         List<String> log = world.logFrom(DELETE);
-        assertEquals(List.of(DELETE, PODS_GONE, "way-b reset", "way-b deploy", ROLLOUT, GATE_ON, ROLLOUT),
-                log.subList(0, 7));
+        assertEquals(List.of(DELETE, PODS_GONE, EMPTY_TABLE, "way-b reset", "way-b deploy", ROLLOUT, GATE_ON,
+                ROLLOUT), log.subList(0, 8));
         assertEquals(List.of(
                 "load start",
                 "sampler start",

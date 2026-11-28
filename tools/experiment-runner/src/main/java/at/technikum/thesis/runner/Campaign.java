@@ -128,6 +128,7 @@ public final class Campaign {
 
         must("deleting the Deployment", cluster.deleteDeployment(preparation));
         must("waiting until the pods are gone", cluster.waitUntilPodsGone(preparation));
+        must("emptying the table " + protocol.database().table(), cluster.emptyTable(preparation));
 
         must("reset", adapter.reset(preparation));
         ChangeTrigger.Result sourceCheck = adapter.sourceCheck(preparation).orElse(null);

@@ -38,6 +38,52 @@ class ClusterControlTest {
     }
 
     @Test
+    void the_table_is_emptied_with_psql_in_the_database_pod_of_the_protocol() throws Exception {
+        control().emptyTable(clock);
+
+        assertEquals(List.of("$ kubectl -n data exec postgres-0 -c postgres -- psql -U thesis -d probe"
+                + " -v ON_ERROR_STOP=1 -c do $$ begin if to_regclass('probe_request') is not null"
+                + " then truncate table probe_request; end if; end $$"), log);
+    }
+
+    @Test
+    void the_table_is_only_emptied_when_it_exists_because_flyway_creates_it_at_the_first_start() throws Exception {
+        assertEquals("do $$ begin if to_regclass('visits') is not null then truncate table visits; end if; end $$",
+                ClusterControl.emptyTableSql("visits"));
+    }
+
+    @Test
+    void emptying_the_table_uses_the_database_fields_and_the_steady_timeout_of_the_protocol() throws Exception {
+        Protocol other = Fixtures.protocolWith(tree -> {
+            tree.put("steadyTimeoutSeconds", 45);
+            ((ObjectNode) tree.get("database")).put("namespace", "db").put("pod", "pg-1").put("container", "pg")
+                    .put("user", "lab").put("name", "labdb").put("table", "visits");
+        });
+        List<String> commands = new ArrayList<>();
+        List<Long> timeouts = new ArrayList<>();
+        CommandRunner recording = new CommandRunner() {
+            @Override
+            public ChangeTrigger.Result run(List<String> argv, RunnerClock usedClock) {
+                commands.add(String.join(" ", argv));
+                return new ChangeTrigger.Result(String.join(" ", argv), 0, 0, 0, "TRUNCATE TABLE");
+            }
+
+            @Override
+            public ChangeTrigger.Result run(List<String> argv, RunnerClock usedClock, long timeoutMillis) {
+                timeouts.add(timeoutMillis);
+                return run(argv, usedClock);
+            }
+        };
+
+        ChangeTrigger.Result result = new ClusterControl(other, recording, probe, time).emptyTable(clock);
+
+        assertEquals(0, result.exitCode());
+        assertEquals(List.of("kubectl -n db exec pg-1 -c pg -- psql -U lab -d labdb -v ON_ERROR_STOP=1"
+                + " -c " + ClusterControl.emptyTableSql("visits")), commands);
+        assertEquals(List.of(45_000L), timeouts);
+    }
+
+    @Test
     void the_rollout_of_the_workload_and_of_another_deployment_is_awaited() throws Exception {
         control().rolloutStatus(clock);
         control().rolloutStatus("platform", "rabbitmq", clock);

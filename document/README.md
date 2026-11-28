@@ -20,15 +20,22 @@ kind create cluster --config deploy/kind/kind-cluster.yaml
 ```
 
 ```bash
-(cd services/probe-service && mvn -q -DskipTests package && docker build -t probe-service:0.2.0 .)
+(cd services/probe-service && mvn -q -DskipTests package && docker build -t probe-service:0.3.0 .)
 ```
 
 ```bash
-kind load docker-image probe-service:0.2.0 --name thesis
+kind load docker-image probe-service:0.3.0 --name thesis
+```
+
+probe-service writes every request to PostgreSQL and does not start without it,
+so the database comes first:
+
+```bash
+kubectl apply -f deploy/data/ && kubectl -n data rollout status statefulset/postgres --timeout=120s
 ```
 
 ```bash
-kubectl apply -f deploy/namespace.yaml && kubectl apply -f deploy/way-a-envvar/
+kubectl apply -f deploy/namespace.yaml && kubectl apply -f deploy/probe-db-secret.yaml && kubectl apply -f deploy/way-a-envvar/
 ```
 
 ```bash
@@ -76,10 +83,11 @@ Journal entries:
 | [09](journal/09-loki-and-grafana.md) | Logs and results in Grafana with Loki |
 | [10](journal/10-way-d-argo-cd-and-helm.md) | Way D, GitOps with Argo CD and Helm |
 | [11](journal/11-scenarios-from-incident-reports.md) | Two scenarios from incident reports |
+| [12](journal/12-database-behind-the-probe-service.md) | A database behind the probe service |
 
 ## Project status
 
-State on 2026-11-21.
+State on 2026-11-28.
 
 | Part | State |
 |---|---|
@@ -99,5 +107,6 @@ State on 2026-11-21.
 | Scenario S5 invalid configuration and pod restart | Defined on 2026-11-21: scenario file, two campaign files, the new step `deleteReadyPod` with unit tests, metrics of S2. Smoke campaign run on 2026-11-21 with four approaches: 4 runs, all VALID. Ways A and D served with 2 replicas after the pod start, see [journal entry 11](journal/11-scenarios-from-incident-reports.md#s5) and the [decision entry](../docs/DECISIONS.md#2026-11-21-s5-deletes-a-ready-pod-while-the-invalid-configuration-waits-at-the-source) |
 | Full campaigns S1 to S5 | Not run. They are the last step, together with the decision model, and need about 31 hours with four approaches. They wait for the open points in journal entries [07](journal/07-way-b-gate-deadlock.md#open-points), [08](journal/08-open-points-in-the-runner.md#open-points), [09](journal/09-loki-and-grafana.md#open-points), [10](journal/10-way-d-argo-cd-and-helm.md#open-points) and [11](journal/11-scenarios-from-incident-reports.md#open-points) |
 | Logs and results in Grafana with Loki and Alloy | Working in the namespace `monitoring`: pod logs of `thesis` and `platform`, two dashboards, results loaded with `tools/loki-load.sh`. No campaign has run with it yet, see [journal entry 09](journal/09-loki-and-grafana.md) |
+| Database | Built on 2026-11-23: PostgreSQL 17.2 in the namespace `data`, probe-service 0.3.0 on Spring Boot 4.2 writes one row per `GET /probe`, all four Ways get the settings from the Secret `probe-db`. Applied by hand, not checked by the runner. First run in the S1 smoke campaign of 2026-11-28, see [journal entry 12](journal/12-database-behind-the-probe-service.md) |
 | Metrics with Prometheus | Not built. The runner reads resource data from the kubelet itself |
 | Angular dashboard | Planned, last |

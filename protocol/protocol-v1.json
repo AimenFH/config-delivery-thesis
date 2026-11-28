@@ -36,7 +36,7 @@
     "approaches/way-d/approach.json"
   ],
   "workload": {
-    "image": "probe-service:0.2.0",
+    "image": "probe-service:0.3.0",
     "container": "probe",
     "cpuRequest": "250m",
     "memoryRequest": "384Mi",
@@ -53,5 +53,13 @@
     "serviceTargetPort": 8080,
     "serviceNodePort": 30080,
     "serviceSelector": {"app": "probe-service"}
+  },
+  "database": {
+    "namespace": "data",
+    "pod": "postgres-0",
+    "container": "postgres",
+    "user": "thesis",
+    "name": "probe",
+    "table": "probe_request"
   }
 }

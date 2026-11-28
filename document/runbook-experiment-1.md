@@ -37,7 +37,7 @@ All commands run from the repository root. The cluster setup itself is in the
 
 ## Before a campaign
 
-Do these five checks before every campaign. A campaign stops at the first run if
+Do these six checks before every campaign. A campaign stops at the first run if
 one of them is not met, but only after several minutes.
 
 ### 1. The runner is built
@@ -49,28 +49,107 @@ cd tools/experiment-runner && mvn -q package && cd ../..
 Expected result: no output, and `tools/experiment-runner/target/experiment-runner.jar`
 exists. The command runs the unit tests and prints the failures if there are any.
 
-### 2. The image `probe-service:0.2.0` is loaded
+### 2. The image `probe-service:0.3.0` is loaded
 
 ```bash
 docker exec thesis-worker crictl images | grep probe-service
 ```
 
-Expected result: a line with `docker.io/library/probe-service` and the tag `0.2.0`.
+Expected result: a line with `docker.io/library/probe-service` and the tag `0.3.0`.
 If it is missing, build and load it:
 
 ```bash
-(cd services/probe-service && mvn -q -DskipTests package && docker build -t probe-service:0.2.0 .)
+(cd services/probe-service && mvn -q -DskipTests package && docker build -t probe-service:0.3.0 .)
 ```
 
 ```bash
-kind load docker-image probe-service:0.2.0 --name thesis
+kind load docker-image probe-service:0.3.0 --name thesis
 ```
 
 Do not rebuild the image between the campaigns that you want to compare. The
 image id is part of the fingerprint, and a campaign stops when the image id
 changes between two of its runs.
 
-### 3. The `platform` Deployments are up
+### 3. The database is up
+
+probe-service runs Flyway at startup and does not start without PostgreSQL, so
+the database has to be there before any Way is deployed. Apply it and the Secret
+that the Ways read:
+
+```bash
+kubectl apply -f deploy/data/
+```
+
+Expected result on a new cluster:
+
+```
+namespace/data created
+secret/postgres-credentials created
+service/postgres created
+statefulset.apps/postgres created
+```
+
+```bash
+kubectl apply -f deploy/probe-db-secret.yaml
+```
+
+Expected result:
+
+```
+secret/probe-db created
+```
+
+Both commands are idempotent. On a cluster that has them already they print
+`unchanged` for every object, so they are safe to run before every campaign.
+
+The user and password in both Secrets are `thesis`. That is a throwaway
+credential for a local cluster, and it is in Git as plain text on purpose.
+
+Wait until the pod `postgres-0` is ready:
+
+```bash
+kubectl -n data rollout status statefulset/postgres --timeout=120s
+```
+
+Expected result, with the first line only while the pod is starting:
+
+```
+Waiting for 1 pods to be ready...
+partitioned roll out complete: 1 new pods have been updated...
+```
+
+Check that the database answers:
+
+```bash
+kubectl -n data exec postgres-0 -c postgres -- psql -U thesis -d probe -c 'select 1'
+```
+
+Expected result:
+
+```
+ ?column?
+----------
+        1
+(1 row)
+```
+
+Once a probe-service pod has started, the table that Flyway created is there:
+
+```bash
+kubectl -n data exec postgres-0 -c postgres -- psql -U thesis -d probe -c '\dt'
+```
+
+Expected result: two tables, `flyway_schema_history` and `probe_request`. Before
+the first start it prints `Did not find any relations.`
+`select count(*) from probe_request` shows how many rows the last run left.
+
+You do not need to empty `probe_request` by hand. The runner empties it before
+every run, as a core step after the old pods are gone, through `kubectl exec`
+into `postgres-0`. If that step fails, the campaign stops. On a new cluster the table
+does not exist yet before the first run, and the step skips it. The reason is in
+[DECISIONS.md](../docs/DECISIONS.md#2026-11-28-the-runner-empties-the-probe_request-table-before-every-run).
+
+### 4. The `platform` Deployments are up
 
 ```bash
 kubectl -n platform get deployments
@@ -92,7 +171,7 @@ reloader-reloader               1/1     1            1
 All seven must be up for every campaign, also when you think only one approach
 matters. The runner checks them before every run.
 
-### 4. The configuration repository is clean
+### 5. The configuration repository is clean
 
 ```bash
 git -C ~/config-repo status --short
@@ -125,7 +204,7 @@ Expected result: no output from the first command and two lines from the second.
 If the folder is somewhere else, set `CONFIG_REPO_WAY_D`. Way D pushes its commits
 to the branch `way-d`, also two or three in every run.
 
-### 5. Nothing else is measuring
+### 6. Nothing else is measuring
 
 ```bash
 kubectl -n thesis get pods
@@ -346,7 +425,7 @@ No class in `tools/experiment-runner/` changes in these steps.
 
 1. Create `deploy/<name>/` with the source objects, the Deployment and the
    Service. Copy the fixed fields from an existing approach: 3 replicas, image
-   `probe-service:0.2.0`, container name `probe`, requests and limits, readiness
+   `probe-service:0.3.0`, container name `probe`, requests and limits, readiness
    probe, topology spread constraint, and the Service. Do not set
    `CONFIG_GATE_ENABLED` in the manifest, the runner sets it.
 2. Install the delivery components of the approach in `platform`. They stay
@@ -408,9 +487,9 @@ Fix the cause and start the campaign again. It begins a new folder with block 1.
 | The reason starts with | Cause | What to do |
 |---|---|---|
 | `deleting the Deployment failed` or `waiting until the pods are gone failed` | The cluster is not reachable, or the old pods did not go away in 120 s | `kubectl get nodes`, then `kubectl -n thesis get pods` |
-| `reset failed with exit code` | The approach could not put its source back to v1. For Way C the output shows the `git` error: no repository at `$CONFIG_REPO`, or the push was rejected | Run the command from the message by hand. For Way C check the [configuration repository](#4-the-configuration-repository-is-clean) |
+| `reset failed with exit code` | The approach could not put its source back to v1. For Way C the output shows the `git` error: no repository at `$CONFIG_REPO`, or the push was rejected | Run the command from the message by hand. For Way C check the [configuration repository](#5-the-configuration-repository-is-clean) |
 | `deploy failed` | `kubectl apply -f` of a manifest failed | Apply the manifest by hand and read the error |
-| `the rollout failed` or `the rollout after setting CONFIG_GATE_ENABLED failed` | The pods were not ready in 120 s. Often the image is not loaded, or for Way C the Config Server is down | `kubectl -n thesis describe pods`, then checks [2](#2-the-image-probe-service020-is-loaded) and [3](#3-the-platform-deployments-are-up) |
+| `the rollout failed` or `the rollout after setting CONFIG_GATE_ENABLED failed` | The pods were not ready in 120 s. Often the image is not loaded, the database is not up, or for Way C the Config Server is down | `kubectl -n thesis describe pods`, then checks [2](#2-the-image-probe-service030-is-loaded), [3](#3-the-database-is-up) and [4](#4-the-platform-deployments-are-up) |
 | `InvariantCheck found a difference: … the protocol says …` | A fixed field of the Deployment or Service differs from the protocol file | Correct the manifest of the approach. Do not change the protocol file |
 | `InvariantCheck found a difference: infrastructure platform/… has …` | A delivery component has 0 replicas or is not ready, for example after an S3 run that was interrupted | `kubectl -n platform scale deployment/<name> --replicas=1`, then `kubectl -n platform rollout status deployment/<name>` |
 | `InvariantCheck found a difference: image id is …` | The image was rebuilt and loaded during the campaign | Start the campaign again and do not rebuild during it |

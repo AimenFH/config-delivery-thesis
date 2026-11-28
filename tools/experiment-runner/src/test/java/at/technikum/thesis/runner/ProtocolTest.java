@@ -64,9 +64,26 @@ class ProtocolTest {
     void workloadHoldsTheFixedFieldsOfEveryApproach() throws Exception {
         Protocol.Workload workload = Fixtures.protocol().workload();
 
-        assertEquals(new Protocol.Workload("probe-service:0.2.0", "probe", "250m", "384Mi", "500m", "512Mi",
+        assertEquals(new Protocol.Workload("probe-service:0.3.0", "probe", "250m", "384Mi", "500m", "512Mi",
                 "/actuator/health/readiness", 8080, 2, "kubernetes.io/hostname", 1, "DoNotSchedule",
                 "NodePort", 80, 8080, 30080, Map.of("app", "probe-service")), workload);
+    }
+
+    @Test
+    void database_names_the_pod_and_the_table_that_is_emptied_before_every_run() throws Exception {
+        Protocol.Database database = Fixtures.protocol().database();
+
+        assertEquals(new Protocol.Database("data", "postgres-0", "postgres", "thesis", "probe", "probe_request"),
+                database);
+    }
+
+    @Test
+    void rejects_a_missing_database_and_an_empty_table_name() throws Exception {
+        Protocol noDatabase = Fixtures.protocolWith(tree -> tree.remove("database"));
+        Protocol noTable = Fixtures.protocolWith(tree -> ((ObjectNode) tree.get("database")).put("table", " "));
+
+        assertEquals(List.of("database is missing"), noDatabase.problems());
+        assertEquals(List.of("database.table is missing"), noTable.problems());
     }
 
     @Test

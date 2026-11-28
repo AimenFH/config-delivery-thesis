@@ -3,10 +3,11 @@
 The probe service has no business logic. It exists to report its own configuration
 state, so that every request is also a measurement.
 
-This page describes version 0.2.0 (`probe-service:0.2.0`). The same image runs in
-every approach. Compared with 0.1.0 it has one addition, the
-[readiness gate](#the-readiness-gate), which is off unless `CONFIG_GATE_ENABLED`
-is `true`.
+This page describes version 0.3.0 (`probe-service:0.3.0`, Spring Boot 4.2). The
+same image runs in every approach. Compared with 0.2.0 it writes one row to
+PostgreSQL for every `GET /probe`, see [the database step](#what-a-request-writes).
+0.2.0 added the [readiness gate](#the-readiness-gate), which is off unless
+`CONFIG_GATE_ENABLED` is `true`.
 
 ## Base URL
 
@@ -47,6 +48,56 @@ Response `200 OK`:
 
 In Ways B and C the controller is rebuilt lazily. After a refresh, the new values
 appear on the first request that reaches the replica, not at refresh time.
+
+Response `503 Service Unavailable` when the database step fails:
+
+```json
+{"error": "database"}
+```
+
+### What a request writes
+
+Before it answers, `/probe` inserts one row into the table `probe_request` of the
+database `probe`, in one transaction:
+
+1. It sets the PostgreSQL `statement_timeout` for this transaction to the
+   effective `demo.timeoutMs`.
+2. It inserts the pod name and the `configVersion` of the answer. The database
+   sets `id` and `received_at`.
+
+| Column | Type | Value |
+|---|---|---|
+| `id` | `bigint`, identity | Set by the database |
+| `received_at` | `timestamptz` | `now()` in the database |
+| `pod` | `text` | Same as the `pod` field of the answer |
+| `config_version` | `text` | Same as the `configVersion` field of the answer |
+
+The effective timeout is `demo.timeoutMs` when it is an integer in [100, 30000],
+and 1000 ms otherwise. So an invalid value such as `abc` makes the pod unready
+when the gate is on, but `/probe` still writes its row with 1000 ms.
+
+The answer is 503 with `{"error":"database"}` when:
+
+| Case | When the answer comes |
+|---|---|
+| The pool gets no connection | After at most 1000 ms (`hikari.connection-timeout`) |
+| The insert runs longer than the effective timeout | After about `timeoutMs` |
+| Any other database error | At once |
+
+The readiness group does not include the database. A pod whose database is down
+stays ready and answers 503, so Kubernetes keeps sending it requests.
+
+Flyway creates the table when the process starts. A pod that cannot reach the
+database at start is expected not to start at all; this has not been tried.
+
+To look at the rows:
+
+```bash
+kubectl -n data exec postgres-0 -c postgres -- psql -U thesis -d probe -c 'select pod, config_version, count(*) from probe_request group by 1, 2'
+```
+
+Expected result: one line per pod and version with its number of requests. The
+runner empties the table before every run, so it only holds the last run.
 
 ## `GET /config-health`
 
@@ -172,6 +223,9 @@ through the Service.
 | `demo.value` | `UNSET` | `DEMO_VALUE` |
 | `demo.configVersion` | `v0` | `DEMO_CONFIGVERSION` |
 | `demo.timeoutMs` | `1000` | `DEMO_TIMEOUTMS` |
+| `spring.datasource.url` | `jdbc:postgresql://postgres.data.svc:5432/probe` | `DB_URL` |
+| `spring.datasource.username` | `thesis` | `DB_USER` |
+| `spring.datasource.password` | `thesis` | `DB_PASSWORD` |
 
 Defaults live in `services/probe-service/src/main/resources/application.yml`.
 `v0` and `UNSET` mean that no external configuration reached the replica.
@@ -184,9 +238,22 @@ Defaults live in `services/probe-service/src/main/resources/application.yml`.
 | `CONFIG_CLIENT_ENABLED` | `false` | Turns the Config Server client on (Way C) |
 | `BUS_ENABLED` | `false` | Turns Spring Cloud Bus and the RabbitMQ health check on (Way C) |
 | `RABBITMQ_HOST`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` | `rabbitmq.platform.svc`, `thesis`, `thesis` | RabbitMQ connection for the Bus |
+| `DB_URL` | `jdbc:postgresql://postgres.data.svc:5432/probe` | JDBC address of PostgreSQL. Every Way sets it as a plain value |
+| `DB_USER`, `DB_PASSWORD` | `thesis`, `thesis` | Database login. Every Way reads them from the Secret `probe-db` in `thesis` |
 | `HOSTNAME` | set by Kubernetes | Becomes the `pod` field, or `local` when it is missing |
 
-## Tests of the gate
+## Tests
+
+The database tests start PostgreSQL 17.2 in a container through Testcontainers,
+so Docker has to run.
+
+| Test class | Covers |
+|---|---|
+| `ConfigRulesTest` | The effective timeout: a valid value is used as it is, a value outside the limits or not a number falls back to 1000 |
+| `ProbeRequestRepositoryTest` | Flyway creates the table with its four columns; a saved row keeps pod and version and gets its time from the database; `findByPod` returns rows in insert order, and nothing for an unknown pod |
+| `ProbeStoresRequestTest` | Every `GET /probe` writes one row with the pod and version of the answer; an invalid `timeoutMs` still answers 200 and writes the row; with a locked table it answers 503 after `timeoutMs`, and 200 again once the lock is gone |
+
+### Tests of the gate
 
 | Test class | Covers |
 |---|---|

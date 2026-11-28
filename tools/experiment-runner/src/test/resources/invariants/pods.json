@@ -40,7 +40,7 @@
                 "value": "false"
               }
             ],
-            "image": "probe-service:0.2.0",
+            "image": "probe-service:0.3.0",
             "imagePullPolicy": "IfNotPresent",
             "name": "probe",
             "ports": [
@@ -233,7 +233,7 @@
               "memory": "384Mi"
             },
             "containerID": "containerd://1eff19bdbcc5ba5f8c99c293011f612addbdeba051a03bfe2adf82ab4c7fba88",
-            "image": "docker.io/library/probe-service:0.2.0",
+            "image": "docker.io/library/probe-service:0.3.0",
             "imageID": "docker.io/library/import-2026-11-07@sha256:8c1c747b8a86f64648490b4d8e611978129033afc9bce40f5565aba89a2e3932",
             "lastState": {
               "terminated": {
@@ -353,7 +353,7 @@
                 "value": "false"
               }
             ],
-            "image": "probe-service:0.2.0",
+            "image": "probe-service:0.3.0",
             "imagePullPolicy": "IfNotPresent",
             "name": "probe",
             "ports": [
@@ -546,7 +546,7 @@
               "memory": "384Mi"
             },
             "containerID": "containerd://844d8bfde2dd5b31dcb35a980401b4b6553b01f3b524ca21d36aa9633ccae16a",
-            "image": "docker.io/library/probe-service:0.2.0",
+            "image": "docker.io/library/probe-service:0.3.0",
             "imageID": "docker.io/library/import-2026-11-07@sha256:8c1c747b8a86f64648490b4d8e611978129033afc9bce40f5565aba89a2e3932",
             "lastState": {
               "terminated": {
@@ -666,7 +666,7 @@
                 "value": "false"
               }
             ],
-            "image": "probe-service:0.2.0",
+            "image": "probe-service:0.3.0",
             "imagePullPolicy": "IfNotPresent",
             "name": "probe",
             "ports": [
@@ -859,7 +859,7 @@
               "memory": "384Mi"
             },
             "containerID": "containerd://bb7ba8fce2d3742608380e1328e5af852f06fde1e66e82778966749f2d47c518",
-            "image": "docker.io/library/probe-service:0.2.0",
+            "image": "docker.io/library/probe-service:0.3.0",
             "imageID": "docker.io/library/import-2026-11-07@sha256:8c1c747b8a86f64648490b4d8e611978129033afc9bce40f5565aba89a2e3932",
             "lastState": {
               "terminated": {

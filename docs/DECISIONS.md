@@ -1396,6 +1396,187 @@ can be missed. The scenario has unit tests and has not run on the cluster yet.
 
 ---
 
+## 2026-11-23: probe-service writes one row to PostgreSQL per request
+
+**Problem.** My professor asked for a database. On 2026-11-22 he confirmed by
+email what he means: the service under test accesses the database while it
+processes requests ("Der zu testende Dienst greift bei der Verarbeitung von
+Anfragen auf die Datenbank zu"). He did not say which database, and not
+whether the service reads or writes. Until now `/probe` touched nothing
+outside the pod.
+
+**Rejected.** The database as a configuration source. That would be a fifth
+delivery approach, and the email describes a database that the service uses
+while it answers requests. Keycloak, which I considered and
+turned down; reason not recorded. An in-memory database inside each pod: the
+tests and the cluster use the PostgreSQL 17.2 image only, and no in-memory
+database appears in the code; reason not recorded. Reads per request: the
+code only writes, and `findByPod` is used by the tests; reason not recorded.
+
+**Chosen.** One PostgreSQL 17.2 in its own namespace `data`, as a StatefulSet
+with one replica and a 1 Gi volume, on the control-plane node like Loki
+(`deploy/data/`). Flyway creates the table `probe_request` (`id`,
+`received_at`, `pod`, `config_version`) when the service starts. Every
+`GET /probe` inserts one row with the pod name and the configuration version
+of the answer, inside a transaction that first sets the PostgreSQL
+`statement_timeout` to the effective `demo.timeoutMs`. That value is
+`timeoutMs` when it lies in [100, 30000], and 1000 when it is out of range or
+not a number. A database error or a timeout answers 503 with
+`{"error":"database"}`. A connection from the pool is awaited for at most
+1000 ms. The image is `probe-service:0.3.0`.
+
+**Cost.** `demo.timeoutMs` now changes what a request does, where before it
+was only checked. An invalid value such as `abc` still writes the row with
+1000 ms, so S2 and S5 behave as before for `/probe`. Each request is slower by
+one round trip and one insert, and all replicas share one database, so
+latency numbers of 0.3.0 should not be mixed with those of 0.2.0. The database is
+not in the readiness group (`readinessState,configGate`), so a pod whose
+database is down stays ready and answers 503. Flyway runs when a pod starts,
+so I expect a pod that cannot reach the database not to start at all; not
+verified. The table grows with every request and is never emptied. The
+`postgres` StatefulSet is not in the `infrastructure` list of any descriptor,
+so the runner does not check it before a run. The placement on the
+control-plane node adds load next to the API server and etcd, as Loki does.
+
+---
+
+## 2026-11-23: probe-service and config-server move to Spring Boot 4.2
+
+**Problem.** The database commit pinned Testcontainers 1.21.4 and Flyway
+10.22.0 on top of Spring Boot 3.3.4. Seven minutes later both services moved
+to Spring Boot 4.2.0 and Spring Cloud 2026.0.0, and the two pins were removed.
+Why the pins were needed and why the upgrade came then: reason not recorded.
+
+**Rejected.** Staying on Spring Boot 3.3.4 with the two pinned versions, which
+is the state of commit `0f924ff`; reason not recorded.
+
+**Chosen.** Spring Boot 4.2.0 and Spring Cloud 2026.0.0 for `probe-service`
+and `config-server`. The code follows the new names: `spring-boot-starter-webmvc`,
+`spring-boot-starter-flyway`, `spring-boot-starter-jdbc-test`, the health
+classes in `org.springframework.boot.health.contributor`, Jackson 3
+(`tools.jackson`, `asString()`) and Testcontainers 2
+(`testcontainers-postgresql`, `org.testcontainers.postgresql`). The Config
+Server image is `config-server:0.2.0`.
+
+**Cost.** Both services changed their framework in the middle of the
+experiment. Every smoke campaign before 2026-11-23 ran on Spring Boot 3.3.4,
+so differences in start time, refresh or bus behaviour between old and new
+runs can come from the upgrade and not from the database. Way C changes most,
+because both of its Spring parts moved. I have no record of a run on the
+cluster with Spring Boot 4 before the S1 smoke campaign of 2026-11-28.
+
+---
+
+## 2026-11-23: Every Way gets the database settings from one Secret through environment variables
+
+**Problem.** The pods of all four Ways need the address, user and password of
+the database. The four Ways deliver configuration in four different ways, and
+the database settings are not the configuration under test.
+
+**Rejected.** Delivering the database settings through each Way's own channel
+(ConfigMap, mounted files, Config Server, Helm values); reason not recorded.
+Relying on the
+defaults in `application.yml` alone (`DB_URL`, `DB_USER`, `DB_PASSWORD` default
+to the cluster address and `thesis`); reason not recorded. Reading the Secret
+`postgres-credentials` of the namespace `data` directly: a pod can only refer
+to a Secret in its own namespace.
+
+**Chosen.** A Secret `probe-db` in `thesis` (`deploy/probe-db-secret.yaml`)
+holds `username` and `password`. The four Deployments (Ways A, B and C, and the
+template of the Helm chart of Way D) set `DB_URL` as a plain value and
+`DB_USER` and `DB_PASSWORD` from `secretKeyRef`, in the same way for every Way.
+For Way D the Secret is not part of the chart. The AppProject only allows
+ConfigMaps, Services and Deployments, so Argo CD could not create it anyway.
+
+**Cost.** The user and password are written twice, in `postgres-credentials`
+and in `probe-db`, and both are in Git as plain `stringData` (`thesis` /
+`thesis`). That is acceptable for a test cluster and not for production. A
+change of the password needs both Secrets and a restart of the pods. The Secret
+`probe-db` has to be applied by hand before any Way. No descriptor, script or
+runbook applies it or `deploy/data/` yet. The Way D chart is in Git twice and
+both copies have to carry the variables.
+
+---
+
+## 2026-11-28: The protocol file names image 0.3.0 and keeps protocol version 1 for the smoke runs
+
+**Problem.** The database commits of 2026-11-23 moved every Way to
+`probe-service:0.3.0`. `protocol/protocol-v1.json` still said `probe-service:0.2.0`.
+`InvariantCheck` compares the two as text, so the first campaign with the database
+stopped before its first run on 2026-11-28:
+`image is probe-service:0.3.0, the protocol says probe-service:0.2.0`.
+The check did its job. The protocol file was not updated when the image changed.
+
+**Rejected.** Pointing the manifests back to 0.2.0: that image has no database,
+and the database is what the professor asked for. Giving the database image the
+tag 0.2.0: two different images would carry one name, and the fingerprint of old
+and new campaigns could no longer be told apart by the tag. Raising
+`protocolVersion` to 2 today: the gate mode that keeps the last good values is
+still undecided and needs another image, so a version 2 today would be followed
+by a version 3 before any full campaign.
+
+**Chosen.** `workload.image` in the protocol file is `probe-service:0.3.0`.
+`protocolVersion` stays 1 until the freeze planned for December, when the image,
+the four approaches, the five scenarios and the gate decision become version 2
+together. The same tag changed in the test fixtures of the runner
+(`ProtocolTest`, `FingerprintTest`, `InvariantCheckTest` and the two files in
+`src/test/resources/invariants/`).
+
+**Cost.** Smoke campaigns from 2026-11-28 on carry `protocolVersion` 1 and a
+different image than the campaigns of 15 to 21 November. Their numbers must not
+be put in one table without saying so. The image is in `fingerprint.json` of
+every campaign, so the two groups can be told apart. No full campaign may run
+before version 2 is frozen.
+
+---
+
+## 2026-11-28: The runner empties the probe_request table before every run
+
+**Problem.** Every `GET /probe` inserts one row into `probe_request`, and nothing
+deleted rows. One run sends about 12,000 requests, so the planned full campaigns of
+about 31 hours would leave about 5.6 million rows on a 1 GiB volume. Later runs
+would also insert into a bigger table than earlier runs, and the order of the runs
+would then be one more difference between them.
+
+**Rejected.** A step in each approach descriptor: the table has nothing to do with
+how a Way delivers configuration, and four copies of the same step could drift
+apart. Emptying the table once per campaign: the runs inside a campaign would still
+see different table sizes. `delete from probe_request`: it leaves dead rows behind
+until vacuum runs, so the file on disk does not shrink. Emptying the table right
+before the load, after the steady check: the probe-service pods are up then, and a
+broken table would only show up during the measurement. Names written into the
+Java code: the protocol file is where the runner keeps every fixed name of the
+workload, and it is copied into `campaign.json` of every campaign.
+
+**Chosen.** A core step in `Campaign.runOnce`, the same for all four Ways, right
+after the old pods are gone and before the reset of the approach.
+`ClusterControl.emptyTable` runs
+`kubectl -n data exec postgres-0 -c postgres -- psql -U thesis -d probe -v ON_ERROR_STOP=1 -c "<sql>"`
+with the steady timeout of the protocol (120 s) as its limit. The SQL is
+`do $$ begin if to_regclass('probe_request') is not null then truncate table probe_request; end if; end $$`:
+Flyway creates the table only when probe-service starts for the first time, so on
+a new cluster the table does not exist before the first run, and a plain
+`truncate` would stop that run. At that point no
+probe-service pod exists, so no insert waits for the lock that `truncate` takes,
+and the steady check that follows writes new rows and so shows that the table
+works again. Like the other core steps, a non-zero exit code stops the campaign
+with exit code 1. Namespace, pod, container, user, database and table are in a new
+object `database` in `protocol/protocol-v1.json`. `protocolVersion` stays 1, as in
+the entry before this one; the freeze as version 2 in December takes the new
+fields with it.
+
+**Cost.** One more `kubectl exec` per run, well under a second. The table is not
+exactly empty when the load starts: the steady check writes 120 or more rows first,
+about the same number in every run. A wrong table name in the protocol file would
+be skipped without an error, because the step cannot tell it from a table Flyway
+has not created yet; `ProtocolTest` pins the name. A jar built before this change cannot read the
+protocol file any more, because the runner rejects unknown fields; the jar has to
+be built again. The runner now needs PostgreSQL even for a Way that would work
+without it, which is true for every Way since 0.3.0 anyway. The rows of a run are
+lost when the next run starts; nothing in the evaluation reads them.
+
+---
+
 <!-- Template for new entries:
 
 ## YYYY-MM-DD — <decision in one line>

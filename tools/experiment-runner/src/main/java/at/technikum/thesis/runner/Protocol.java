@@ -42,8 +42,30 @@ public record Protocol(
         int bootstrapResamples,
         long bootstrapSeed,
         List<String> approaches,
-        Workload workload
+        Workload workload,
+        Database database
 ) {
+
+    public record Database(
+            String namespace,
+            String pod,
+            String container,
+            String user,
+            String name,
+            String table
+    ) {
+
+        public List<String> problems() {
+            List<String> problems = new ArrayList<>();
+            text(problems, "database.namespace", namespace);
+            text(problems, "database.pod", pod);
+            text(problems, "database.container", container);
+            text(problems, "database.user", user);
+            text(problems, "database.name", name);
+            text(problems, "database.table", table);
+            return problems;
+        }
+    }
 
     public record Workload(
             String image,
@@ -153,6 +175,11 @@ public record Protocol(
             problems.add("workload is missing");
         } else {
             problems.addAll(workload.problems());
+        }
+        if (database == null) {
+            problems.add("database is missing");
+        } else {
+            problems.addAll(database.problems());
         }
         return problems;
     }

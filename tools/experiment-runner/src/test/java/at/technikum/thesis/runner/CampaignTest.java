@@ -333,6 +333,18 @@ class CampaignTest {
 
         assertEquals(1, world.campaign().run());
         assertFalse(world.log.stream().anyMatch(entry -> entry.endsWith(" reset")));
+        assertFalse(world.log.stream().anyMatch(entry -> entry.contains("truncate table")));
+    }
+
+    @Test
+    void a_table_that_cannot_be_emptied_stops_the_campaign_with_1_before_the_reset() throws Exception {
+        Fakes.World world = world("s1-valid-change", 1, 1, 4);
+        world.kubectl.fails = command -> command.contains("truncate table probe_request");
+
+        assertEquals(1, world.campaign().run());
+        assertEquals(0, world.store.records.size());
+        assertFalse(world.log.stream().anyMatch(entry -> entry.endsWith(" reset")));
+        assertFalse(world.log.stream().anyMatch(entry -> entry.equals("load start")));
     }
 
     @Test
